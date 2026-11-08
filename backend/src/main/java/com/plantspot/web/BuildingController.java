@@ -30,8 +30,8 @@ public class BuildingController {
 	/** 예: GET /api/buildings?dong=하단동&jibun=1160-6 */
 	@GetMapping
 	public List<BuildingResponse> find(
-			@RequestParam @NotBlank(message = "동을 입력하세요.") String dong,
-			@RequestParam @NotBlank(message = "지번을 입력하세요.") String jibun) {
+			@RequestParam("dong") @NotBlank(message = "동을 입력하세요.") String dong,
+			@RequestParam("jibun") @NotBlank(message = "지번을 입력하세요.") String jibun) {
 		return buildingService.findByAddress(dong, jibun).stream().map(BuildingResponse::of).toList();
 	}
 
@@ -44,9 +44,9 @@ public class BuildingController {
 	/** 예: GET /api/buildings/nearby?dong=하단동&jibun=1160-6&radius=150 */
 	@GetMapping("/nearby")
 	public NearbyResponse nearby(
-			@RequestParam @NotBlank(message = "동을 입력하세요.") String dong,
-			@RequestParam @NotBlank(message = "지번을 입력하세요.") String jibun,
-			@RequestParam(defaultValue = "150") @DecimalMin(value = "1", message = "반경은 1m 이상이어야 합니다.")
+			@RequestParam("dong") @NotBlank(message = "동을 입력하세요.") String dong,
+			@RequestParam("jibun") @NotBlank(message = "지번을 입력하세요.") String jibun,
+			@RequestParam(name = "radius", defaultValue = "150") @DecimalMin(value = "1", message = "반경은 1m 이상이어야 합니다.")
 			@DecimalMax(value = "1000", message = "반경은 1000m 이하여야 합니다.") double radius) {
 		Nearby result = buildingService.nearby(dong, jibun, radius);
 		return new NearbyResponse(BuildingResponse.of(result.base()), radius, result.neighbors().size(),

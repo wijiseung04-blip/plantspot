@@ -40,27 +40,27 @@ public class FileApiController {
 	/** multipart/form-data: file, category(SENSOR_LOG / FLOOR_PLAN / PLANT_PHOTO), roomId(선택) */
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<FileResponse> upload(@AuthenticationPrincipal LoginMember me,
-			@RequestPart("file") MultipartFile file, @RequestParam FileCategory category,
-			@RequestParam(required = false) Long roomId) {
+			@RequestPart("file") MultipartFile file, @RequestParam("category") FileCategory category,
+			@RequestParam(name = "roomId", required = false) Long roomId) {
 		FileResponse saved = service.upload(me, file, category, roomId);
 		return ResponseEntity.created(URI.create("/api/files/" + saved.id())).body(saved);
 	}
 
 	@GetMapping
 	public List<FileResponse> myFiles(@AuthenticationPrincipal LoginMember me,
-			@RequestParam(required = false) FileCategory category) {
+			@RequestParam(name = "category", required = false) FileCategory category) {
 		return service.myFiles(me, category);
 	}
 
 	@GetMapping("/{id}")
-	public FileResponse info(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public FileResponse info(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		return service.info(me, id);
 	}
 
 	/** 다운로드. inline=true 이면 브라우저에서 바로 보기(이미지 미리보기). */
 	@GetMapping("/{id}/content")
-	public ResponseEntity<Resource> download(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
-			@RequestParam(defaultValue = "false") boolean inline) {
+	public ResponseEntity<Resource> download(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
+			@RequestParam(name = "inline", defaultValue = "false") boolean inline) {
 		Download d = service.download(me, id);
 		ContentDisposition disposition = (inline ? ContentDisposition.inline() : ContentDisposition.attachment())
 				.filename(d.filename(), StandardCharsets.UTF_8).build();
@@ -73,7 +73,7 @@ public class FileApiController {
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<Void> delete(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public ResponseEntity<Void> delete(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		service.delete(me, id);
 		return ResponseEntity.noContent().build();
 	}

@@ -29,24 +29,24 @@ public class ReportApiController {
 	}
 
 	@GetMapping("/api/rooms/{id}/report")
-	public ResponseEntity<byte[]> report(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public ResponseEntity<byte[]> report(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		return file(service.report(me, id), MediaType.APPLICATION_PDF, "plantspot-room-" + id + "-report.pdf", false);
 	}
 
 	/** 계절별 배치도. mode=direct|level, plantId 를 주면 그 식물 적합도 색. download=true 면 내려받기. */
 	@GetMapping("/api/rooms/{id}/sunlight/image")
-	public ResponseEntity<byte[]> image(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
-			@RequestParam(defaultValue = "WINTER_SOLSTICE") SeasonDay season,
-			@RequestParam(defaultValue = "direct") String mode, @RequestParam(required = false) Long plantId,
-			@RequestParam(defaultValue = "false") boolean download) {
+	public ResponseEntity<byte[]> image(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
+			@RequestParam(name = "season", defaultValue = "WINTER_SOLSTICE") SeasonDay season,
+			@RequestParam(name = "mode", defaultValue = "direct") String mode, @RequestParam(name = "plantId", required = false) Long plantId,
+			@RequestParam(name = "download", defaultValue = "false") boolean download) {
 		return file(service.seasonImage(me, id, season, mode, plantId), MediaType.IMAGE_PNG,
 				"plantspot-room-" + id + "-" + season.name().toLowerCase() + ".png", !download);
 	}
 
 	@GetMapping("/api/rooms/{id}/sunlight/csv")
-	public ResponseEntity<byte[]> sunlightCsv(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
-			@RequestParam(required = false) SeasonDay season,
-			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+	public ResponseEntity<byte[]> sunlightCsv(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
+			@RequestParam(name = "season", required = false) SeasonDay season,
+			@RequestParam(name = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 		String name = "plantspot-room-" + id + "-" + (date != null ? date.toString()
 				: (season != null ? season : SeasonDay.WINTER_SOLSTICE).name().toLowerCase()) + ".csv";
 		return file(service.sunlightCsv(me, id, season, date).getBytes(StandardCharsets.UTF_8),
@@ -54,8 +54,8 @@ public class ReportApiController {
 	}
 
 	@GetMapping("/api/weather/hours/csv")
-	public ResponseEntity<byte[]> weatherCsv(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+	public ResponseEntity<byte[]> weatherCsv(@RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+			@RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 		return file(service.weatherCsv(from, to).getBytes(StandardCharsets.UTF_8),
 				new MediaType("text", "csv", StandardCharsets.UTF_8), "asos-" + from + "-" + to + ".csv", false);
 	}

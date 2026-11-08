@@ -48,20 +48,20 @@ public class RecommendationApiController {
 	}
 
 	@GetMapping("/api/rooms/{id}/recommendations")
-	public RecommendationView recommendations(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public RecommendationView recommendations(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		return recommendations.recommendations(me, id);
 	}
 
 	@PostMapping("/api/rooms/{id}/recommendations/refresh")
-	public RecommendationView refresh(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
-			@RequestParam(defaultValue = "10") @Min(value = 1, message = "개수는 1~50입니다.")
+	public RecommendationView refresh(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
+			@RequestParam(name = "limit", defaultValue = "10") @Min(value = 1, message = "개수는 1~50입니다.")
 			@Max(value = 50, message = "개수는 1~50입니다.") int limit) {
 		return recommendations.refresh(me, id, limit);
 	}
 
 	/** 한 식물의 계절별 칸 점수(적합도 지도) */
 	@GetMapping("/api/rooms/{id}/recommendations/{plantId}")
-	public PlantFit fit(@AuthenticationPrincipal LoginMember me, @PathVariable Long id, @PathVariable Long plantId) {
+	public PlantFit fit(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id, @PathVariable("plantId") Long plantId) {
 		return recommendations.fit(me, id, plantId);
 	}
 
@@ -80,19 +80,19 @@ public class RecommendationApiController {
 	}
 
 	@PutMapping("/api/my-plants/{id}")
-	public MyPlantView update(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
+	public MyPlantView update(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
 			@Valid @RequestBody SaveMyPlant req) {
 		return myPlants.update(me, id, req);
 	}
 
 	/** 위치만 옮기기 (에디터에서 끌어다 놓기) */
 	@PatchMapping("/api/my-plants/{id}/position")
-	public MyPlantView move(@AuthenticationPrincipal LoginMember me, @PathVariable Long id, @RequestBody Move req) {
+	public MyPlantView move(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id, @RequestBody Move req) {
 		return myPlants.move(me, id, req);
 	}
 
 	@DeleteMapping("/api/my-plants/{id}")
-	public ResponseEntity<Void> delete(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public ResponseEntity<Void> delete(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		myPlants.delete(me, id);
 		return ResponseEntity.noContent().build();
 	}

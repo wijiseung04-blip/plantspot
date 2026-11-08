@@ -37,12 +37,12 @@ public class SunlightApiController {
 	 * 둘 다 없으면 올해 동지.
 	 */
 	@GetMapping
-	public SunlightView get(@AuthenticationPrincipal LoginMember me, @PathVariable Long roomId,
-			@RequestParam(required = false) SeasonDay season,
-			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-			@RequestParam(required = false) @Min(value = 1901, message = "연도는 1901~2099입니다.")
+	public SunlightView get(@AuthenticationPrincipal LoginMember me, @PathVariable("roomId") Long roomId,
+			@RequestParam(name = "season", required = false) SeasonDay season,
+			@RequestParam(name = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+			@RequestParam(name = "year", required = false) @Min(value = 1901, message = "연도는 1901~2099입니다.")
 			@Max(value = 2099, message = "연도는 1901~2099입니다.") Integer year,
-			@RequestParam(defaultValue = "true") boolean calibrated) {
+			@RequestParam(name = "calibrated", defaultValue = "true") boolean calibrated) {
 		if (date != null) {
 			return service.forDate(me, roomId, date, calibrated);
 		}
@@ -52,8 +52,8 @@ public class SunlightApiController {
 
 	/** 계절 대표일 4개를 다시 계산해 저장. */
 	@PostMapping("/calculate")
-	public List<SunlightView> calculate(@AuthenticationPrincipal LoginMember me, @PathVariable Long roomId,
-			@RequestParam(required = false) @Min(value = 1901, message = "연도는 1901~2099입니다.")
+	public List<SunlightView> calculate(@AuthenticationPrincipal LoginMember me, @PathVariable("roomId") Long roomId,
+			@RequestParam(name = "year", required = false) @Min(value = 1901, message = "연도는 1901~2099입니다.")
 			@Max(value = 2099, message = "연도는 1901~2099입니다.") Integer year) {
 		return service.calculateSeasons(me, roomId, year != null ? year : SunlightService.currentYear());
 	}

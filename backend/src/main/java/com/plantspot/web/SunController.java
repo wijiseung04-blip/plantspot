@@ -29,10 +29,10 @@ public class SunController {
 	/** 예: GET /api/sun?dateTime=2026-12-21T12:30&lat=35.1154&lon=128.9605 (시각은 한국 시각) */
 	@GetMapping
 	public SunResponse sun(
-			@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTime,
-			@RequestParam(required = false) @DecimalMin(value = "-90", message = "위도는 -90 이상이어야 합니다.")
+			@RequestParam("dateTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTime,
+			@RequestParam(name = "lat", required = false) @DecimalMin(value = "-90", message = "위도는 -90 이상이어야 합니다.")
 			@DecimalMax(value = "90", message = "위도는 90 이하여야 합니다.") Double lat,
-			@RequestParam(required = false) @DecimalMin(value = "-180", message = "경도는 -180 이상이어야 합니다.")
+			@RequestParam(name = "lon", required = false) @DecimalMin(value = "-180", message = "경도는 -180 이상이어야 합니다.")
 			@DecimalMax(value = "180", message = "경도는 180 이하여야 합니다.") Double lon) {
 		double latitude = lat != null ? lat : SunService.DEFAULT_LATITUDE;
 		double longitude = lon != null ? lon : SunService.DEFAULT_LONGITUDE;

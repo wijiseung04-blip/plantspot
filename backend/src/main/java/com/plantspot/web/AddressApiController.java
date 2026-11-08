@@ -24,7 +24,7 @@ public class AddressApiController {
 
 	/** 예: GET /api/address/search?query=낙동대로 550 */
 	@GetMapping("/api/address/search")
-	public List<AddressResult> search(@RequestParam @NotBlank(message = "주소를 입력하세요.")
+	public List<AddressResult> search(@RequestParam("query") @NotBlank(message = "주소를 입력하세요.")
 			@Size(max = 100, message = "주소는 100자 이하입니다.") String query) {
 		return service.search(query);
 	}

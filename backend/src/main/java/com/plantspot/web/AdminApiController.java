@@ -43,7 +43,7 @@ public class AdminApiController {
 	}
 
 	@PutMapping("/{id}/role")
-	public MemberRow changeRole(@PathVariable Long id, @Valid @RequestBody RoleRequest req) {
+	public MemberRow changeRole(@PathVariable("id") Long id, @Valid @RequestBody RoleRequest req) {
 		memberService.changeRole(id, req.role());
 		var m = memberService.get(id);
 		return new MemberRow(m.getId(), m.getLoginId(), m.getNickname(), m.getRole(), m.getRole().getLabel(),

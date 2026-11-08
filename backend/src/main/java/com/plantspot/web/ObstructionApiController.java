@@ -32,25 +32,25 @@ public class ObstructionApiController {
 	}
 
 	@GetMapping
-	public List<ObstructionView> get(@AuthenticationPrincipal LoginMember me, @PathVariable Long houseId) {
+	public List<ObstructionView> get(@AuthenticationPrincipal LoginMember me, @PathVariable("houseId") Long houseId) {
 		return service.view(me, houseId);
 	}
 
 	/** 건물 데이터로 다시 계산 (층을 바꾸었거나 건물 데이터를 갱신했을 때). */
 	@PostMapping("/recalculate")
-	public List<ObstructionView> recalculate(@AuthenticationPrincipal LoginMember me, @PathVariable Long houseId) {
+	public List<ObstructionView> recalculate(@AuthenticationPrincipal LoginMember me, @PathVariable("houseId") Long houseId) {
 		return service.recalculate(me, houseId);
 	}
 
 	/** 실측 가림 각도 저장 (센서 분석 결과, 직접 측정). */
 	@PutMapping("/measured")
-	public List<ObstructionView> saveMeasured(@AuthenticationPrincipal LoginMember me, @PathVariable Long houseId,
+	public List<ObstructionView> saveMeasured(@AuthenticationPrincipal LoginMember me, @PathVariable("houseId") Long houseId,
 			@RequestBody @NotEmpty(message = "실측 값이 없습니다.") List<@Valid MeasuredAngle> measured) {
 		return service.saveMeasured(me, houseId, measured);
 	}
 
 	@DeleteMapping("/measured")
-	public List<ObstructionView> clearMeasured(@AuthenticationPrincipal LoginMember me, @PathVariable Long houseId) {
+	public List<ObstructionView> clearMeasured(@AuthenticationPrincipal LoginMember me, @PathVariable("houseId") Long houseId) {
 		return service.clearMeasured(me, houseId);
 	}
 }

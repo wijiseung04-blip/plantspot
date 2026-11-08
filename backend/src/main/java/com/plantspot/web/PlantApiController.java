@@ -34,14 +34,14 @@ public class PlantApiController {
 
 	/** GET /api/plants?keyword=스킨&light=055001&level=089001&page=0&size=20 */
 	@GetMapping("/api/plants")
-	public PlantPage search(@RequestParam(required = false) String keyword,
-			@RequestParam(required = false) String light, @RequestParam(required = false) String level,
-			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+	public PlantPage search(@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "light", required = false) String light, @RequestParam(name = "level", required = false) String level,
+			@RequestParam(name = "page", defaultValue = "0") int page, @RequestParam(name = "size", defaultValue = "20") int size) {
 		return service.search(keyword, light, level, page, size);
 	}
 
 	@GetMapping("/api/plants/{id}")
-	public PlantResponse get(@PathVariable Long id) {
+	public PlantResponse get(@PathVariable("id") Long id) {
 		return service.get(id);
 	}
 
@@ -54,17 +54,17 @@ public class PlantApiController {
 	}
 
 	@PutMapping("/api/admin/plants/{id}/conversion")
-	public PlantResponse adjust(@PathVariable Long id, @Valid @RequestBody ConversionRequest req) {
+	public PlantResponse adjust(@PathVariable("id") Long id, @Valid @RequestBody ConversionRequest req) {
 		return service.adjust(id, req);
 	}
 
 	@PostMapping("/api/admin/plants/{id}/conversion/reset")
-	public PlantResponse reset(@PathVariable Long id) {
+	public PlantResponse reset(@PathVariable("id") Long id) {
 		return service.reset(id);
 	}
 
 	@DeleteMapping("/api/admin/plants/{id}")
-	public ResponseEntity<Void> delete(@PathVariable Long id) {
+	public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
 		service.delete(id);
 		return ResponseEntity.noContent().build();
 	}

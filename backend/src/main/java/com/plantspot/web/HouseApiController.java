@@ -50,18 +50,18 @@ public class HouseApiController {
 	}
 
 	@GetMapping("/api/houses/{id}")
-	public HouseResponse house(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public HouseResponse house(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		return service.house(me, id);
 	}
 
 	@PutMapping("/api/houses/{id}")
-	public HouseResponse updateHouse(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
+	public HouseResponse updateHouse(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
 			@Valid @RequestBody UpdateHouse req) {
 		return service.updateHouse(me, id, req);
 	}
 
 	@DeleteMapping("/api/houses/{id}")
-	public ResponseEntity<Void> deleteHouse(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public ResponseEntity<Void> deleteHouse(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		service.deleteHouse(me, id);
 		return ResponseEntity.noContent().build();
 	}
@@ -69,30 +69,30 @@ public class HouseApiController {
 	// ----- 방 -----
 
 	@PostMapping("/api/houses/{id}/rooms")
-	public ResponseEntity<RoomResponse> createRoom(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
+	public ResponseEntity<RoomResponse> createRoom(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
 			@Valid @RequestBody SaveRoom req) {
 		RoomResponse room = service.createRoom(me, id, req);
 		return ResponseEntity.created(URI.create("/api/rooms/" + room.id())).body(room);
 	}
 
 	@GetMapping("/api/houses/{id}/rooms")
-	public List<RoomResponse> rooms(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public List<RoomResponse> rooms(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		return service.rooms(me, id);
 	}
 
 	@GetMapping("/api/rooms/{id}")
-	public RoomResponse room(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public RoomResponse room(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		return service.room(me, id);
 	}
 
 	@PutMapping("/api/rooms/{id}")
-	public RoomResponse updateRoom(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
+	public RoomResponse updateRoom(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
 			@Valid @RequestBody SaveRoom req) {
 		return service.updateRoom(me, id, req);
 	}
 
 	@DeleteMapping("/api/rooms/{id}")
-	public ResponseEntity<Void> deleteRoom(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public ResponseEntity<Void> deleteRoom(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		service.deleteRoom(me, id);
 		return ResponseEntity.noContent().build();
 	}
@@ -100,25 +100,25 @@ public class HouseApiController {
 	// ----- 창문 -----
 
 	@PostMapping("/api/rooms/{id}/windows")
-	public ResponseEntity<WindowResponse> createWindow(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
+	public ResponseEntity<WindowResponse> createWindow(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
 			@Valid @RequestBody SaveWindow req) {
 		WindowResponse window = service.createWindow(me, id, req);
 		return ResponseEntity.created(URI.create("/api/windows/" + window.id())).body(window);
 	}
 
 	@GetMapping("/api/rooms/{id}/windows")
-	public List<WindowResponse> windows(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public List<WindowResponse> windows(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		return service.windows(me, id);
 	}
 
 	@PutMapping("/api/windows/{id}")
-	public WindowResponse updateWindow(@AuthenticationPrincipal LoginMember me, @PathVariable Long id,
+	public WindowResponse updateWindow(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
 			@Valid @RequestBody SaveWindow req) {
 		return service.updateWindow(me, id, req);
 	}
 
 	@DeleteMapping("/api/windows/{id}")
-	public ResponseEntity<Void> deleteWindow(@AuthenticationPrincipal LoginMember me, @PathVariable Long id) {
+	public ResponseEntity<Void> deleteWindow(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
 		service.deleteWindow(me, id);
 		return ResponseEntity.noContent().build();
 	}

@@ -52,7 +52,7 @@ public class PageController {
 	}
 
 	@GetMapping("/plants/{id}")
-	public String plant(@PathVariable Long id, Model model) {
+	public String plant(@PathVariable("id") Long id, Model model) {
 		model.addAttribute("plantId", id);
 		return "plants/detail";
 	}
@@ -71,28 +71,28 @@ public class PageController {
 	}
 
 	@GetMapping("/my/houses/{id}")
-	public String house(@PathVariable Long id, Model model) {
+	public String house(@PathVariable("id") Long id, Model model) {
 		model.addAttribute("houseId", id);
 		model.addAttribute("curtains", Codes.CURTAINS);
 		return "my/house";
 	}
 
 	@GetMapping("/my/rooms/{id}")
-	public String room(@PathVariable Long id, Model model) {
+	public String room(@PathVariable("id") Long id, Model model) {
 		model.addAttribute("roomId", id);
 		model.addAttribute("curtains", Codes.CURTAINS);
 		return "my/room";
 	}
 
 	@GetMapping("/my/rooms/{id}/sunlight")
-	public String sunlight(@PathVariable Long id, Model model) {
+	public String sunlight(@PathVariable("id") Long id, Model model) {
 		model.addAttribute("roomId", id);
 		model.addAttribute("seasons", Codes.SEASONS);
 		return "my/sunlight";
 	}
 
 	@GetMapping("/my/rooms/{id}/recommendations")
-	public String recommendations(@PathVariable Long id, Model model) {
+	public String recommendations(@PathVariable("id") Long id, Model model) {
 		model.addAttribute("roomId", id);
 		model.addAttribute("seasons", Codes.SEASONS);
 		return "my/recommendations";
