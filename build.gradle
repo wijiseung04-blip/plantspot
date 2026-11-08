@@ -1,14 +1,78 @@
-// 루트: 하위 프로젝트(backend, frontend)가 같은 플러그인 버전을 쓰도록 여기서만 버전을 정한다.
 plugins {
-	id 'org.springframework.boot' version '4.1.2' apply false
-	id 'io.spring.dependency-management' version '1.1.7' apply false
+	id 'java'
+	id 'org.springframework.boot' version '4.1.2'
+	id 'io.spring.dependency-management' version '1.1.7'
 }
 
-subprojects {
-	group = 'com.plantspot'
-	version = '0.0.1-SNAPSHOT'
+group = 'com.plantspot'
+version = '0.0.1-SNAPSHOT'
 
-	repositories {
-		mavenCentral()
+// 프로젝트 하나 안에서 나눈다:
+//   src/main/java/com/plantspot/backend  — REST API·계산·DB·보안 (Controller → Service → Repository → SQLite)
+//   src/main/java/com/plantspot/frontend — 화면 컨트롤러, src/main/resources/templates·static — 화면 파일
+
+repositories {
+	mavenCentral()
+}
+
+java {
+	toolchain {
+		// 기본은 Java 26. JDK 26이 없는 환경에서는 -PjavaVersion=25 처럼 바꿔서 빌드할 수 있다.
+		languageVersion = JavaLanguageVersion.of((findProperty('javaVersion') ?: '26') as int)
 	}
 }
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'      // 화면(frontend)
+	implementation 'org.xerial:sqlite-jdbc'                   // DB: SQLite 파일(data/plantspot.db), GeoPackage 읽기
+	implementation 'org.hibernate.orm:hibernate-community-dialects'   // SQLiteDialect
+	implementation 'org.apache.pdfbox:pdfbox:3.0.8'           // 리포트 PDF
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	// sqlite-jdbc 네이티브 라이브러리 로드 경고 제거
+	jvmArgs '--enable-native-access=ALL-UNNAMED'
+}
+
+// ----- [① DB 데이터 생성 프로그램] 웹 서버 없이 실행하고 끝난다. DB 설정은 application(-local).properties -----
+
+def runner = { String name, String desc, List<String> extra ->
+	tasks.register(name, JavaExec) {
+		group = 'plantspot'
+		description = desc
+		classpath = sourceSets.main.runtimeClasspath
+		mainClass = 'com.plantspot.PlantSpotApplication'
+		workingDir = projectDir
+		jvmArgs '--enable-native-access=ALL-UNNAMED'
+		args = ['--spring.main.web-application-type=none'] + extra
+	}
+}
+
+// 국토부 GIS 건물통합정보 GeoPackage → building 테이블
+// 사용: ./gradlew importBuildings -Pgpkg=C:/data/saha.gpkg
+runner('importBuildings', 'GeoPackage 건물 데이터를 building 테이블로 가져온다.',
+		['--plantspot.import=buildings', '--gpkg=' + (findProperty('gpkg') ?: '')])
+
+// 농사로 실내정원용 식물 → plant_species
+// 사용: ./gradlew importPlants
+runner('importPlants', '농사로 실내정원용 식물 목록·상세를 모두 받아 plant_species 테이블에 저장한다.',
+		['--plantspot.import=plants'])
+
+// 기상청 ASOS 시간자료 → weather_hour
+// 사용: ./gradlew collectWeather -Pfrom=2026-11-01 -Pto=2026-11-07  (생략하면 최근 7일)
+runner('collectWeather', '기상청 ASOS 시간자료(일조·일사·운량)를 받아 weather_hour 테이블에 저장한다.',
+		['--plantspot.import=weather', '--from=' + (findProperty('from') ?: ''), '--to=' + (findProperty('to') ?: '')])
