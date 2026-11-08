@@ -38,14 +38,17 @@ public class HouseService {
 	private final RoomWindowRepository windows;
 	private final BuildingService buildingService;
 	private final MemberService memberService;
+	private final com.plantspot.obstruction.ObstructionAngleRepository obstructions;
 
 	public HouseService(HouseRepository houses, RoomRepository rooms, RoomWindowRepository windows,
-			BuildingService buildingService, MemberService memberService) {
+			BuildingService buildingService, MemberService memberService,
+			com.plantspot.obstruction.ObstructionAngleRepository obstructions) {
 		this.houses = houses;
 		this.rooms = rooms;
 		this.windows = windows;
 		this.buildingService = buildingService;
 		this.memberService = memberService;
+		this.obstructions = obstructions;
 	}
 
 	// ----- 집 -----
@@ -77,14 +80,21 @@ public class HouseService {
 	@Transactional
 	public HouseResponse updateHouse(LoginMember me, Long houseId, UpdateHouse req) {
 		House house = loadHouse(me, houseId);
+		double oldElevation = house.floorElevation();
 		house.update(req.name().trim(), req.floor(),
 				req.floorHeight() != null ? req.floorHeight() : house.getFloorHeight());
+		if (house.floorElevation() != oldElevation) {
+			// 눈 높이가 바뀌었으니 건물 데이터 가림 각도는 다음 조회 때 다시 계산
+			obstructions.deleteByHouseAndSource(house.getId(), com.plantspot.obstruction.ObstructionSource.BUILDING);
+		}
 		return HouseResponse.of(house);
 	}
 
 	@Transactional
 	public void deleteHouse(LoginMember me, Long houseId) {
-		houses.delete(loadHouse(me, houseId));
+		House house = loadHouse(me, houseId);
+		obstructions.deleteByHouse(houseId);
+		houses.delete(house);
 		log.info("집 삭제: {} (회원 {})", houseId, me.getUsername());
 	}
 
