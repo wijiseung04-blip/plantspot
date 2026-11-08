@@ -23,6 +23,12 @@ public class MyPageController {
 		return "my/house";
 	}
 
+	@GetMapping("/my/files")
+	public String files(Model model) {
+		model.addAttribute("categories", com.plantspot.file.FileCategory.values());
+		return "my/files";
+	}
+
 	@GetMapping("/my/rooms/{id}")
 	public String room(@PathVariable Long id, Model model) {
 		model.addAttribute("roomId", id);

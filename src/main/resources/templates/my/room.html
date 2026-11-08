@@ -37,6 +37,16 @@
 			<button type="submit">창문 추가</button>
 		</form>
 
+		<h2>평면도 이미지</h2>
+		<div class="card">
+			<p class="muted">집 평면도 사진이나 그림을 올려 두면 평면도 에디터에서 밑그림으로 쓸 수 있습니다.</p>
+			<img id="floor-plan" alt="평면도 이미지" style="max-width:100%;display:none;margin-bottom:12px">
+			<form id="plan-form" class="inline">
+				<input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
+				<button type="submit" class="small">올리기</button>
+			</form>
+		</div>
+
 		<h2>방 정보 수정</h2>
 		<form id="room-form" class="card form">
 			<div class="row">
@@ -119,6 +129,8 @@
 						<td><button class="small danger" data-del="${w.id}">삭제</button></td></tr>`).join('')
 					: '<tr><td colspan="5" class="muted">창문이 없습니다.</td></tr>';
 				draw(room);
+				const img = document.getElementById('floor-plan');
+				if (room.floorPlanFileId) { img.src = `/api/files/${room.floorPlanFileId}/content?inline=true`; img.style.display = 'block'; }
 			}
 			load().catch(show);
 
@@ -137,6 +149,15 @@
 					msg.hidden = true;
 					await load();
 				} catch (e) { show(e); }
+			});
+
+			document.getElementById('plan-form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const fd = new FormData(ev.target);
+				fd.append('category', 'FLOOR_PLAN');
+				fd.append('roomId', id);
+				try { await api('/api/files', { method: 'POST', body: fd }); ev.target.reset(); await load(); }
+				catch (e) { show(e); }
 			});
 
 			rf.addEventListener('submit', async (ev) => {
