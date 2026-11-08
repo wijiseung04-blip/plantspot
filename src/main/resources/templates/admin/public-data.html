@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('공공 데이터')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<h1>공공 데이터</h1>
+		<nav class="tabs" th:replace="~{admin/nav :: nav('public-data')}"></nav>
+		<p id="msg" class="flash err" hidden></p>
+		<div class="grid">
+			<div class="card">
+				<h2 style="margin-top:0">상태</h2>
+				<p id="status" class="muted"></p>
+			</div>
+			<div class="card">
+				<h2 style="margin-top:0">기상청 ASOS 시간자료 받기</h2>
+				<form id="collect" class="form">
+					<div class="row">
+						<label>시작 <input type="date" name="from" required></label>
+						<label>끝 <input type="date" name="to"></label>
+					</div>
+					<button type="submit">받기</button>
+				</form>
+				<p id="collect-result" class="muted"></p>
+			</div>
+			<div class="card">
+				<h2 style="margin-top:0">해 위치 계산 검증</h2>
+				<p class="muted">우리 계산(NOAA 공식) 일출·남중·일몰과 천문연 출몰시각 비교 (하단동 기준)</p>
+				<form id="compare" class="inline"><input type="date" name="date" required><button class="small" type="submit">비교</button></form>
+				<div id="compare-result" class="muted" style="margin-top:8px"></div>
+			</div>
+		</div>
+		<h2>ASOS 시간자료 보기</h2>
+		<form id="hours" class="inline"><input type="date" name="date" required><button class="small" type="submit">보기</button></form>
+		<div class="table-wrap" style="margin-top:8px">
+			<table><thead><tr><th>시각</th><th>기온</th><th>습도</th><th>일조(시간)</th><th>일사(MJ/㎡)</th><th>전운량</th><th>맑음</th></tr></thead>
+				<tbody id="hour-rows"></tbody></table>
+		</div>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', () => {
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+			document.querySelectorAll('input[type=date]').forEach(i => i.value = yesterday);
+			const v = (x) => x == null ? '-' : x;
+
+			async function status() {
+				const s = await api('/api/admin/public-data/status');
+				document.getElementById('status').innerHTML =
+					`천문연 키: ${s.kasiKey ? '있음' : '<b>없음</b>'} · 기상청 키: ${s.kmaKey ? '있음' : '<b>없음</b>'}<br>` +
+					`ASOS 지점 ${s.stationId} (부산, 활용가이드에서 확인)<br>저장된 출몰시각 ${s.sunEvents}일 · ASOS ${s.weatherHours}시간`;
+			}
+			status().catch(show);
+
+			document.getElementById('collect').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const f = new FormData(ev.target);
+				try {
+					const r = await api(`/api/admin/weather/collect?from=${f.get('from')}${f.get('to') ? '&to=' + f.get('to') : ''}`, { method: 'POST' });
+					document.getElementById('collect-result').textContent = `${r.from}~${r.to}: ${r.daysFetched}일 조회, ${r.hoursSaved}시간 저장, ${r.daysSkipped}일은 이미 있음`;
+					msg.hidden = true; status();
+				} catch (e) { show(e); }
+			});
+
+			document.getElementById('compare').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				try {
+					const c = await api('/api/sun-events/compare?date=' + ev.target.date.value);
+					const row = (n, a, b, d) => `<div>${n}: 계산 ${v(a)} / 천문연 ${v(b)}${d != null ? ` (차이 ${d}분)` : ''}</div>`;
+					document.getElementById('compare-result').innerHTML =
+						row('일출', c.calcSunrise, c.kasiSunrise, c.sunriseDiffMin) + row('남중', c.calcSolarNoon, c.kasiSolarNoon, c.solarNoonDiffMin) +
+						row('일몰', c.calcSunset, c.kasiSunset, c.sunsetDiffMin) +
+						(c.kasiAvailable ? `<div>시민박명 ${v(c.civilDawn)} ~ ${v(c.civilDusk)}</div>` : '<div>천문연 자료 없음(키 필요)</div>');
+				} catch (e) { show(e); }
+			});
+
+			document.getElementById('hours').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				try {
+					const rows = await api('/api/weather/hours?date=' + ev.target.date.value);
+					document.getElementById('hour-rows').innerHTML = rows.map(h => `<tr><td>${h.observedAt.replace('T', ' ').slice(0, 16)}</td>
+						<td>${v(h.temperature)}</td><td>${v(h.humidity)}</td><td>${v(h.sunshineHours)}</td><td>${v(h.insolation)}</td>
+						<td>${v(h.cloudCover)}</td><td>${h.clear ? '☀' : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">자료 없음</td></tr>';
+				} catch (e) { show(e); }
+			});
+		});
+	</script>
+</body>
+</html>
