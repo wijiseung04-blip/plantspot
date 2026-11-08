@@ -116,7 +116,8 @@
 				document.getElementById('room-links').innerHTML = `
 					<a href="/my/rooms/${id}/sunlight">계절별 햇빛</a>
 					<a href="/editor?roomId=${id}">평면도 햇빛 에디터</a>
-					<a href="/my/rooms/${id}/recommendations">식물 추천</a>`;
+					<a href="/my/rooms/${id}/recommendations">식물 추천</a>
+					<a href="/api/rooms/${id}/report">리포트 PDF 받기</a>`;
 				rf.name.value = room.name; rf.orientationDeg.value = room.orientationDeg;
 				rf.ceilingHeight.value = room.ceilingHeight; rf.curtain.value = room.curtain;
 				rf.winterMinTemp.value = room.winterMinTemp ?? '';

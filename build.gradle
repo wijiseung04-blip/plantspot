@@ -27,6 +27,7 @@ dependencies {
 	implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'   // Boot 4.1 BOM이 관리하는 것은 6 (Security 7과 호환)
 	implementation 'org.xerial:sqlite-jdbc'
 	implementation 'org.hibernate.orm:hibernate-community-dialects'
+	implementation 'org.apache.pdfbox:pdfbox:3.0.8'   // 리포트 PDF
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
