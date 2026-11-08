@@ -59,7 +59,10 @@
 					: '<option value="">건물 데이터 없음 (importBuildings 로 먼저 가져오기)</option>';
 			} catch (e) { show(e); }
 
+			let buildingId = null;
+			['dong', 'jibun'].forEach(n => document.querySelector(`#form [name=${n}]`).addEventListener('input', () => buildingId = null));
 			addressSearch(document.getElementById('address-box'), (b) => {
+				buildingId = b.buildingId;
 				selectDong(document.getElementById('dong'), b.dong);
 				document.querySelector('#form [name=jibun]').value = b.jibun;
 			});
@@ -85,7 +88,7 @@
 				const f = new FormData(ev.target);
 				try {
 					const r = await api('/api/preview', { method: 'POST', json: {
-						dong: f.get('dong'), jibun: f.get('jibun').trim(), floor: Number(f.get('floor')), windowAzimuth: Number(f.get('windowAzimuth')) } });
+						dong: f.get('dong'), jibun: f.get('jibun').trim(), floor: Number(f.get('floor')), windowAzimuth: Number(f.get('windowAzimuth')), buildingId } });
 					msg.hidden = true;
 					document.getElementById('result').hidden = false;
 					document.getElementById('headline').textContent =

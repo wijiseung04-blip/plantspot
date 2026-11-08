@@ -55,7 +55,7 @@ public class HouseService {
 
 	@Transactional
 	public HouseResponse createHouse(LoginMember me, CreateHouse req) {
-		Building building = buildingService.findByAddress(req.dong(), req.jibun()).get(0);
+		Building building = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
 		House house = houses.save(new House(memberService.get(me.getId()), building, req.name().trim(), req.floor(),
 				req.floorHeight() != null ? req.floorHeight() : DEFAULT_FLOOR_HEIGHT));
 		log.info("집 등록: {} {} {} (회원 {})", house.getId(), req.dong(), req.jibun(), me.getUsername());

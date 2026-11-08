@@ -24,7 +24,9 @@ public final class HouseRequests {
 			@NotNull(message = "층을 입력하세요.") @Min(value = 1, message = "층은 1 이상입니다.")
 			@Max(value = 80, message = "층은 80 이하입니다.") Integer floor,
 			@DecimalMin(value = "2.2", message = "층 높이는 2.2m 이상입니다.")
-			@DecimalMax(value = "6", message = "층 높이는 6m 이하입니다.") Double floorHeight) {
+			@DecimalMax(value = "6", message = "층 높이는 6m 이하입니다.") Double floorHeight,
+			/** 같은 지번에 건물이 여러 동일 때 고른 건물 (없으면 가장 높은 건물) */
+			Long buildingId) {
 	}
 
 	public record UpdateHouse(

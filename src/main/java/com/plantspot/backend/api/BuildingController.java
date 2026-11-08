@@ -60,12 +60,12 @@ public class BuildingController {
 		return Math.round(v * 100.0) / 100.0;
 	}
 
-	public record BuildingResponse(Long id, String dong, String jibun, String buildingName, String usage,
+	public record BuildingResponse(Long id, String dong, String jibun, String buildingName, String dongLabel, String usage,
 			Integer groundFloors, double height, HeightSource heightSource, double area, double x, double y,
 			double latitude, double longitude) {
 
 		static BuildingResponse of(Building b) {
-			return new BuildingResponse(b.getId(), b.getDong(), b.getJibun(), b.getBuildingName(), b.getUsage(),
+			return new BuildingResponse(b.getId(), b.getDong(), b.getJibun(), b.getBuildingName(), b.getDongLabel(), b.getUsage(),
 					b.getGroundFloors(), b.getHeight(), b.getHeightSource(), round(b.getArea()), round(b.getCenterX()),
 					round(b.getCenterY()), Math.round(b.getLatitude() * 1e6) / 1e6,
 					Math.round(b.getLongitude() * 1e6) / 1e6);

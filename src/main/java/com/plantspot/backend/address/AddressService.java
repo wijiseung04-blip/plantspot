@@ -1,7 +1,9 @@
 package com.plantspot.backend.address;
 
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -54,9 +56,14 @@ public class AddressService {
 			log.warn("주소 검색 실패: {}", e.getMessage());
 			throw new UnavailableException("주소 검색 서비스에 연결하지 못했습니다: " + e.getMessage());
 		}
-		log.info("주소 검색 '{}' → {}건", q, found.size());
-		return found.stream().map(c -> new AddressResult(c.roadAddress(), c.parcelAddress(), c.zipcode(),
-				c.buildingName(), TmConverter.toLatLon(c.x(), c.y()).latitude(),
+		// 아파트 단지처럼 같은 주소가 동마다 여러 번 오면 하나로 합친다 (주소 + 건물명 상세가 같으면 같은 결과)
+		Map<String, AddressApi.Candidate> unique = new LinkedHashMap<>();
+		for (AddressApi.Candidate c : found) {
+			unique.putIfAbsent(c.roadAddress() + "|" + c.parcelAddress() + "|" + c.buildingDetail(), c);
+		}
+		log.info("주소 검색 '{}' → {}건 (중복 합쳐 {}건)", q, found.size(), unique.size());
+		return unique.values().stream().map(c -> new AddressResult(c.roadAddress(), c.parcelAddress(), c.zipcode(),
+				c.buildingName(), c.buildingDetail(), TmConverter.toLatLon(c.x(), c.y()).latitude(),
 				TmConverter.toLatLon(c.x(), c.y()).longitude(), match(c.x(), c.y()).map(MatchedBuilding::of).orElse(null)))
 				.toList();
 	}
@@ -92,7 +99,7 @@ public class AddressService {
 
 	/** 주소 후보 하나. building 이 null 이면 우리 건물 데이터(사하구)에 없는 주소. */
 	public record AddressResult(String roadAddress, String parcelAddress, String zipcode, String buildingName,
-			double latitude, double longitude, MatchedBuilding building) {
+			String buildingDetail, double latitude, double longitude, MatchedBuilding building) {
 	}
 
 	public record MatchedBuilding(Long id, String dong, String jibun, double height, HeightSource heightSource,
