@@ -36,16 +36,24 @@
 
 		/** 같은 지번의 건물 중 하나를 고르게 한다 (아파트 단지 등). */
 		function showBuildings() {
-			const label = (b) => [b.dongLabel || b.buildingName || '이름 없는 건물', b.groundFloors ? b.groundFloors + '층' : null,
+			// 이름·층수가 없는 작은 건물(경비실·분리수거장 등, 건축물대장 미연계)은 '부속 건물'로 접어 둔다
+			const isAnnex = (b) => !b.dongLabel && !b.buildingName && !b.groundFloors;
+			const label = (b) => [b.dongLabel || b.buildingName || '부속 건물(정보 없음)', b.groundFloors ? b.groundFloors + '층' : null,
 				'높이 ' + b.height + 'm', b.usage, Math.round(b.area) + '㎡'].filter(Boolean).map(escapeHtml).join(' · ');
 			// 처음 선택: 브이월드 동 이름(예: 101동)과 같은 건물 → 없으면 가장 높은 건물
 			const detail = (picked.buildingDetail || '').replace(/\s/g, '');
 			let def = parcel.find(b => detail && (b.dongLabel || '').replace(/\s/g, '') === detail)
 				|| [...parcel].sort((a, b) => b.height - a.height || b.area - a.area)[0];
+			// 모두 부속 건물이면(단독주택 등) 접지 않고 다 보여준다
+			const main = parcel.every(isAnnex) ? parcel : parcel.filter(b => !isAnnex(b) || b.id === def.id);
+			const annex = parcel.filter(b => !main.includes(b));
+			const radio = (b) => `<label style="display:block;margin:2px 0;color:var(--text)"><input type="radio" name="addr-bld" value="${b.id}" ${b.id === def.id ? 'checked' : ''}> ${label(b)}</label>`;
 			out.innerHTML = `<div class="card" style="margin:6px 0;padding:10px">
 				<p style="margin:0 0 6px"><strong>${escapeHtml(picked.roadAddress || picked.parcelAddress)}</strong></p>
-				${parcel.length > 1 ? `<p class="muted" style="margin:0 0 6px">이 지번에 건물이 ${parcel.length}개 있습니다. 우리 집 건물(동)을 고르세요.</p>` : ''}
-				${parcel.map(b => `<label style="display:block;margin:2px 0;color:var(--text)"><input type="radio" name="addr-bld" value="${b.id}" ${b.id === def.id ? 'checked' : ''}> ${label(b)}</label>`).join('')}
+				${parcel.length > 1 ? `<p class="muted" style="margin:0 0 6px">이 지번에 건물이 ${main.length}개 있습니다. 우리 집 건물(동)을 고르세요.</p>` : ''}
+				${main.map(radio).join('')}
+				${annex.length ? `<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">부속 건물 ${annex.length}개 더 보기 (경비실·분리수거장 등 이름·층수 정보가 없는 작은 건물)</summary>
+					${annex.map(radio).join('')}</details>` : ''}
 			</div>`;
 			const emit = () => {
 				const b = parcel.find(x => String(x.id) === out.querySelector('input[name=addr-bld]:checked').value);
