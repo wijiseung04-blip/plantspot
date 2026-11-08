@@ -25,6 +25,7 @@
 			</label>
 			<label id="calib-box" hidden><input type="checkbox" id="calibrated" checked> 센서 보정 반영</label>
 			<div><button type="button" id="recalc" class="secondary">다시 계산</button></div>
+			<div><a id="dl-png" class="button secondary">배치도 PNG</a> <a id="dl-csv" class="button secondary">칸별 CSV</a></div>
 		</div>
 
 		<div class="row">
@@ -78,6 +79,13 @@
 					: `/api/rooms/${id}/sunlight?season=${season}`;
 				view = await api(url);
 				document.getElementById('calib-box').hidden = season !== 'DATE';
+				const mode = document.getElementById('mode').value === 'level' ? 'level' : 'direct';
+				const png = document.getElementById('dl-png');
+				png.hidden = season === 'DATE';
+				png.href = `/api/rooms/${id}/sunlight/image?season=${season}&mode=${mode}&download=true`;
+				document.getElementById('dl-csv').href = season === 'DATE'
+					? `/api/rooms/${id}/sunlight/csv?date=${document.getElementById('date').value}`
+					: `/api/rooms/${id}/sunlight/csv?season=${season}`;
 				render();
 			}
 			load().catch(show);

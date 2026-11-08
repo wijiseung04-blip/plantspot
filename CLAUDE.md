@@ -62,45 +62,49 @@ testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 ```
 group은 `com.plantspot`. 건물 가져오기용 Gradle 작업 `importBuildings`(JavaExec, mainClass `com.plantspot.tool.BuildingImporter`, `-Pgpkg=경로`)도 추가할 것.
 
-## 4. 현재 코드 상태 (1단계)
+## 4. 현재 코드 상태 (아두이노 전까지 구현 완료)
 
-> ⚠️ 1단계 코드는 자바 컴파일러가 없는 환경에서 작성됐다. 계산 로직은 파이썬으로 동일 공식을 돌려 검증했지만 **자바 빌드는 아직 한 번도 성공 확인되지 않았다.** 가장 먼저 `./gradlew build`로 컴파일 오류를 잡을 것.
-> 또한 1단계 코드는 Spring Boot 3.3 기준으로 작성됐다가 4.1 프로젝트로 옮겨졌으므로, Boot 4 호환성도 함께 확인할 것.
+빌드·테스트는 `./gradlew build` 로 확인됨(JDK 26이 없으면 `-PjavaVersion=25`). 계산 로직은 단위 테스트, API는 MockMvc 테스트로 검증.
+테스트 DB는 메모리 SQLite(`src/test/resources/application.properties`, ddl-auto=update).
 
 ```
 com.plantspot
-├── PlantSpotApplication
-├── config/SecurityConfig        # 현재 전부 permitAll, /api/** CSRF 제외 (2단계에서 교체)
-├── sun/
-│   ├── SolarCalculator          # NOAA 태양 위치 공식, @Component
-│   ├── SolarPosition            # record(altitudeDeg, azimuthDeg) — 방위각은 북0/동90/남180/서270
-│   └── SunService               # 한국 시각(Asia/Seoul) → 해 위치
-├── geo/TmConverter              # EPSG:5186 → WGS84 위경도 (GRS80, Snyder 역변환)
-├── building/
-│   ├── Building                 # @Entity, table "building"
-│   ├── BuildingRepository       # 동·지번 검색, 사각형 범위 검색
-│   ├── BuildingService
-│   ├── HeightRule               # 최종 높이 결정 규칙
-│   └── HeightSource             # MEASURED / FLOOR_ESTIMATE / DEFAULT
-├── tool/
-│   ├── BuildingImporter         # ① 데이터 생성 프로그램: GeoPackage → building 테이블 (plain JDBC main)
-│   └── GpkgGeometryReader       # GeoPackage 도형 바이너리(Polygon/MultiPolygon) 파서
-├── web/                         # SunController, BuildingController, HomeController
-└── common/                      # NotFoundException, GlobalExceptionHandler(@RestControllerAdvice)
+├── config/        SecurityConfig(비회원/회원/관리자, /api/** 는 401·403 JSON, CSRF 켬), DataDirectoryInitializer
+├── common/        NotFound/Forbidden/Conflict/Unavailable 예외, GlobalExceptionHandler(REST), ErrorResponse
+├── member/        회원가입·로그인, Role(USER/ADMIN), AdminInitializer(app.admin.password 로 첫 관리자)
+├── sun/           SolarCalculator(NOAA), SunService
+├── geo/           TmConverter(EPSG:5186↔위경도), Wkt
+├── building/      Building, HeightRule, BuildingService (동·지번, 주변 건물)
+├── house/         House, Room(다각형 cm, 방향, 천장, 커튼, 겨울 최저 실내 온도), RoomWindow(테이블 room_window), HouseEvents
+├── obstruction/   ObstructionCalculator(외곽선 0.25m 샘플, 5° 72칸), obstruction_angle(BUILDING/SENSOR)
+├── sunlight/      SunlightCalculator(창 투영 직사광 + CIE 하늘 성분 + BRE 내부 반사), sunlight_cell / sunlight_summary
+├── plant/         농사로 XML·가져오기(PlantImportService, ./gradlew importPlants), PlantConverter(변환표), plant_species
+├── weather/       천문연 출몰시각 sun_event, 기상청 ASOS weather_hour, 맑은 시간·자연광 판단, ./gradlew collectWeather
+├── recommend/     PlantScorer(적합도), recommendation, my_plant(알림), PreviewService(비회원 간단 예측)
+├── file/          upload_file + FileStorage(data/uploads)
+├── report/        리포트 PDF(PDFBox + 한글 글꼴), 배치도 PNG, CSV
+├── tool/          BuildingImporter, GpkgGeometryReader (./gradlew importBuildings -Pgpkg=)
+└── web/           REST·화면 컨트롤러
+static/editor/     ② 평면도 햇빛 에디터 (solar.js·light.js = 서버와 같은 공식, node src/test/js/editor-parity.js 로 일치 확인)
 ```
-테스트: `SolarCalculatorTest`, `TmConverterTest`, `HeightRuleTest` (JUnit5 + AssertJ, 한글 메서드명)
 
-**확인용 API**
-- `GET /api/sun?dateTime=2026-12-21T12:30[&lat=&lon=]` (위치 생략 시 하단동 35.1154, 128.9605)
-- `GET /api/buildings?dong=하단동&jibun=1160-6`
-- `GET /api/buildings/nearby?dong=하단동&jibun=1160-6&radius=150`
+**주의할 점 (작업하며 확인한 것)**
+- SQLite에서 id가 자동 번호(rowid)가 되려면 칸 타입이 정확히 `integer` → 모든 엔티티 id에 `@Column(columnDefinition = "integer")`. `SchemaTest`가 검사
+- 벌크 delete 쿼리 대신 엔티티 단위 삭제(`deleteAll(find...)`) — SQLite가 번호를 재사용해 영속성 컨텍스트와 충돌함
+- 계산 결과(가림 각도·칸별 햇빛·추천)는 HouseEvents/ObstructionChanged/PlantEvents 로 낡으면 지우고, 다음 조회 때 다시 계산
+- Thymeleaf `<script>` 안의 `[(`, `[[` 는 인라인 문법으로 해석됨 → 스크립트에 `th:inline="none"`
+- `thymeleaf-extras-springsecurity7` 은 Maven에 없음 → Boot 4.1 BOM이 관리하는 `springsecurity6` 사용
+- PDF 한글 글꼴: `app.report.font`(없으면 윈도 맑은 고딕 → 맥 → 리눅스 나눔·Noto 순으로 찾음)
 
-**검증된 기준값** (파이썬 검증, 테스트 기대값으로 사용 중)
+**확인용 API (일부)**
+- `GET /api/sun?dateTime=2026-12-21T12:30[&lat=&lon=]`, `GET /api/buildings?dong=하단동&jibun=1160-6`, `GET /api/buildings/nearby?...&radius=150`
+
+**검증된 기준값** (테스트 기대값으로 사용 중)
 - 부산(35.10N, 128.97E) 정오 최고 고도: 춘분 54.7°, 하지 78.3°, 동지 31.5°, 방위각 약 180°
 - 2026-11-08 부산 일출 계산값 약 06:52
 - EPSG:5186 (200000, 600000) → (38.0, 127.0)
 - 하단동 1160-6 중심점 (378731.47, 281659.43) → (35.1154, 128.9605), 면적 약 300㎡, 높이 18.75m(MEASURED)
-- 사하구 가져오기 결과: MEASURED 15,360 / FLOOR_ESTIMATE 9,444 / DEFAULT 16,467 (합계 41,271)
+- 사하구 가져오기 결과: MEASURED 15,360 / FLOOR_ESTIMATE 9,444 / DEFAULT 16,467 (합계 41,271) — 실제 파일로 재확인 필요
 
 ## 5. 데이터 소스
 
@@ -222,11 +226,11 @@ GET  /api/rooms/{id}/report            (PDF 다운로드)
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| 1 | 기본 구조, 해 위치, 좌표 변환, 건물 가져오기 | 코드 작성됨, **빌드 확인 필요** |
-| 2 | 회원·권한(Security 7), 집·방·창문 등록, 파일 업로드 기본 | 예정 |
-| 3 | 가림 각도, 창문 투영, 칸별 햇빛, 농사로 가져오기 프로그램 | 예정 |
-| 4 | 센서 수집 프로그램, 출몰시각·ASOS 연동, 보정 로직, 식물 추천 | 예정 |
-| 5 | 평면도 햇빛 에디터, 리포트 다운로드, 실제 방 검증 사진 | 예정 |
+| 1 | 기본 구조, 해 위치, 좌표 변환, 건물 가져오기 | 완료 (실제 사하구 파일로 가져오기 확인 필요) |
+| 2 | 회원·권한(Security 7), 집·방·창문 등록, 파일 업로드 기본 | 완료 |
+| 3 | 가림 각도, 창문 투영, 칸별 햇빛, 농사로 가져오기 프로그램 | 완료 (농사로 키 승인 후 실제 응답 확인 필요) |
+| 4 | 센서 수집 프로그램, 출몰시각·ASOS 연동, 보정 로직, 식물 추천 | 출몰시각·ASOS·추천 완료 / **센서 수집·보정은 아두이노 작업 때** (실측 가림 각도 저장 API `PUT /api/houses/{id}/obstructions/measured` 와 판단 함수 isClear·isNaturalLight 준비됨) |
+| 5 | 평면도 햇빛 에디터, 리포트 다운로드, 실제 방 검증 사진 | 에디터·리포트 완료 / 검증 사진 예정 |
 | 6 | 통합 테스트, 예외 정리, 발표 준비 (마감 12/18) | 예정 |
 
 ※ 맑은 날 센서 데이터가 쌓여야 하므로 센서 측정은 가능한 한 빨리 시작
@@ -243,8 +247,8 @@ GET  /api/rooms/{id}/report            (PDF 다운로드)
 
 ## 12. 확인 필요 사항
 
-- [ ] `./gradlew build` 성공 여부 (1단계 코드 첫 컴파일)
-- [ ] `hibernate-community-dialects` 버전 자동 관리 여부
+- [x] `./gradlew build` 성공 여부 (JDK 25로 확인, JDK 26 환경에서 한 번 더)
+- [x] `hibernate-community-dialects` 버전 자동 관리 여부 (Boot BOM이 관리)
 - [ ] GIS 칸 정의서로 A0~A28 의미 확정
 - [ ] ASOS 부산 지점 번호
 - [ ] 농사로 API 키 승인 후 실제 응답 형식 확인

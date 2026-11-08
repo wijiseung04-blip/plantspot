@@ -31,7 +31,8 @@
 			</div>
 		</div>
 		<h2>ASOS 시간자료 보기</h2>
-		<form id="hours" class="inline"><input type="date" name="date" required><button class="small" type="submit">보기</button></form>
+		<form id="hours" class="inline"><input type="date" name="date" required><button class="small" type="submit">보기</button>
+			<a id="hours-csv" class="button small secondary">최근 30일 CSV</a></form>
 		<div class="table-wrap" style="margin-top:8px">
 			<table><thead><tr><th>시각</th><th>기온</th><th>습도</th><th>일조(시간)</th><th>일사(MJ/㎡)</th><th>전운량</th><th>맑음</th></tr></thead>
 				<tbody id="hour-rows"></tbody></table>
@@ -44,6 +45,8 @@
 			const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 			document.querySelectorAll('input[type=date]').forEach(i => i.value = yesterday);
 			const v = (x) => x == null ? '-' : x;
+			const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+			document.getElementById('hours-csv').href = `/api/weather/hours/csv?from=${monthAgo}&to=${yesterday}`;
 
 			async function status() {
 				const s = await api('/api/admin/public-data/status');

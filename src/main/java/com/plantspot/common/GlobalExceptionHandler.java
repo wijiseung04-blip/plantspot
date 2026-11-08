@@ -47,6 +47,12 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.CONFLICT, e.getMessage(), req);
 	}
 
+	@ExceptionHandler(UnavailableException.class)
+	public ResponseEntity<ErrorResponse> handleUnavailable(UnavailableException e, HttpServletRequest req) {
+		log.warn("처리 불가: {} ({})", e.getMessage(), req.getRequestURI());
+		return build(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage(), req);
+	}
+
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ResponseEntity<ErrorResponse> handleBodyValidation(MethodArgumentNotValidException e, HttpServletRequest req) {
 		String message = e.getBindingResult().getFieldErrors().stream()
