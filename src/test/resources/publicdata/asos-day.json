@@ -1,0 +1,6 @@
+{"response":{"header":{"resultCode":"00","resultMsg":"NORMAL_SERVICE"},
+"body":{"dataType":"JSON","items":{"item":[
+{"tm":"2026-11-07 09:00","rnum":"1","stnId":"159","stnNm":"부산","ta":"14.2","hm":"55","ss":"1.0","ssQcflg":"","icsr":"1.12","dc10Tca":"2"},
+{"tm":"2026-11-07 10:00","rnum":"2","stnId":"159","stnNm":"부산","ta":"15.0","hm":"52","ss":"0.2","ssQcflg":"","icsr":"0.80","dc10Tca":"8"},
+{"tm":"2026-11-07 11:00","rnum":"3","stnId":"159","stnNm":"부산","ta":"","hm":"","ss":"0.9","ssQcflg":"9","icsr":"","dc10Tca":""}
+]},"pageNo":1,"numOfRows":24,"totalCount":3}}}

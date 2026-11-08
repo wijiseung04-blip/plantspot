@@ -30,6 +30,11 @@ public class AdminController {
 		return "admin/members";
 	}
 
+	@GetMapping("/public-data")
+	public String publicData() {
+		return "admin/public-data";
+	}
+
 	@PostMapping("/members/{id}/role")
 	public String changeRole(@PathVariable Long id, @RequestParam Role role, RedirectAttributes redirect) {
 		try {

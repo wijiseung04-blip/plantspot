@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- 테스트용 가상 응답 (천문연 출몰시각 형식만 따름) -->
+<response><header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE.</resultMsg></header>
+<body><items><item>
+<aste>1847  </aste><astm>0526  </astm><civile>1750  </civile><civilm>0625  </civilm>
+<latitude>3507</latitude><latitudeNum>35.1100000</latitudeNum><location></location><locdate>20261108</locdate>
+<longitude>12858</longitude><longitudeNum>128.9600000</longitudeNum>
+<moonrise>0213</moonrise><moonset>1531</moonset><moontransit>0849</moontransit>
+<naute>1819  </naute><nautm>0555  </nautm><sunrise>0652</sunrise><sunset>1723</sunset><suntransit>1207</suntransit>
+</item></items><numOfRows>10</numOfRows><pageNo>1</pageNo><totalCount>1</totalCount></body></response>

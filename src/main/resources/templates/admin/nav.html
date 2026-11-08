@@ -4,6 +4,7 @@
 	<nav th:fragment="nav(active)" class="tabs">
 		<a th:href="@{/admin/members}" th:classappend="${active == 'members'} ? 'active'">회원</a>
 		<a th:href="@{/admin/plants}" th:classappend="${active == 'plants'} ? 'active'">식물 변환표</a>
+		<a th:href="@{/admin/public-data}" th:classappend="${active == 'public-data'} ? 'active'">공공 데이터</a>
 	</nav>
 </body>
 </html>
