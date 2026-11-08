@@ -36,6 +36,12 @@ public class PlantPageController {
 		return "try";
 	}
 
+	/** [② 평면도 햇빛 에디터] 비회원도 쓸 수 있는 브라우저 프로그램. ?roomId= 이면 회원의 방을 불러온다. */
+	@GetMapping("/editor")
+	public String editor() {
+		return "editor";
+	}
+
 	@GetMapping("/admin/plants")
 	public String admin(Model model) {
 		model.addAttribute("count", service.count());
