@@ -31,7 +31,7 @@
 					<p class="muted" style="margin:0">창밖 스카이라인 (색칠 = 건물에 가린 하늘, 화살표 = 창 방향)</p></div>
 				<div class="table-wrap" style="flex:2 1 400px">
 					<table>
-						<thead><tr><th>계절</th><th>창에 해 드는 시간</th><th>창가 (0~1m)</th><th>방 가운데 (1~2.5m)</th><th>안쪽 (2.5m~)</th></tr></thead>
+						<thead><tr><th style="white-space:nowrap">계절</th><th style="white-space:nowrap">창에 해 드는 시간</th><th>창가 (0~1m)</th><th>방 가운데 (1~2.5m)</th><th>안쪽 (2.5m~)</th></tr></thead>
 						<tbody id="seasons"></tbody>
 					</table>
 				</div>
@@ -82,7 +82,7 @@
 					document.getElementById('headline').textContent =
 						`${r.dong} ${r.jibun} (건물 높이 ${r.buildingHeight}m) ${r.floor}층 ${r.direction} 창 — 창 앞 평균 가림 각도 ${r.frontObstructionDeg}°`;
 					drawSky(r.skyline, r.windowAzimuth);
-					document.getElementById('seasons').innerHTML = r.seasons.map(s => `<tr><td>${s.label}</td><td>${hm(s.windowSunMinutes)}</td>
+					document.getElementById('seasons').innerHTML = r.seasons.map(s => `<tr><td style="white-space:nowrap">${s.label}</td><td style="white-space:nowrap">${hm(s.windowSunMinutes)}</td>
 						<td>${zone(s.nearWindow)}</td><td>${zone(s.middle)}</td><td>${zone(s.deep)}</td></tr>`).join('');
 					document.getElementById('plants').innerHTML = r.plants.length ? r.plants.map(p => `
 						<a class="card" href="/plants/${p.id}" style="text-decoration:none;color:inherit;display:flex;gap:12px">

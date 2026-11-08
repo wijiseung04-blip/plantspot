@@ -41,7 +41,7 @@ public class SecurityConfig {
 
 		http
 			.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/", "/login", "/signup", "/try", "/plants", "/plants/**", "/error",
+				.requestMatchers("/", "/login", "/signup", "/try", "/plants", "/plants/**", "/editor", "/editor/**", "/error",
 						"/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/sun/**", "/api/buildings/**", "/api/plants/**").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/preview").permitAll()
