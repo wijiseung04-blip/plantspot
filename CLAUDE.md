@@ -78,6 +78,7 @@ backend/src/main/java/com/plantspot
 ├── plant/         농사로 가져오기, PlantConverter(변환표), plant_species
 ├── weather/       sun_event, weather_hour, 맑은 시간·자연광 판단
 ├── recommend/     PlantScorer, recommendation, my_plant(알림), PreviewService(비회원 간단 예측)
+├── address/       도로명주소 → 건물 찾기 (VworldAddressApi, AddressService)
 ├── file/          upload_file + FileStorage(backend/data/uploads)
 ├── report/        리포트 PDF(PDFBox + 한글 글꼴), 배치도 PNG, CSV
 ├── tool/          BuildingImporter(GeoPackage → building 테이블), GpkgGeometryReader
@@ -120,7 +121,7 @@ API 키·관리자 비밀번호는 `backend/src/main/resources/application-local
 | 한국천문연구원 출몰시각 | 공공데이터포털 API, XML | 키 발급 완료 | `api.kasi.service-key` |
 | 기상청 ASOS 시간자료 | 공공데이터포털 API, JSON/XML | 키 발급 완료 | `api.kma.service-key`, `api.kma.station-id` |
 | 농촌진흥청 실내정원용 식물 | 농사로 Open API, XML | **키 승인 대기** | `api.nongsaro.api-key` |
-| 브이월드 주소 검색 | API | 키 발급(선택 기능) | `api.vworld.key` |
+| 브이월드 주소 검색 | 검색 API(주소, EPSG:5186 좌표) | 키 발급, **도로명주소로 건물 찾기에 사용** | `api.vworld.key` (`api.vworld.domain` 필요 시) |
 
 ### 5-1. GIS 건물통합정보
 - 좌표계 **EPSG:5186** (Korea 2000 / Central Belt 2010, 미터). 거리 계산은 이 좌표 그대로 사용
@@ -135,7 +136,10 @@ API 키·관리자 비밀번호는 `backend/src/main/resources/application-local
 - 아니고 층수 있으면 → 층수 × 층고 (공동주택 3.0, 단독주택 3.5, 그 외 3.6) (FLOOR_ESTIMATE)
 - 둘 다 없으면 → 3.5m (DEFAULT)
 
-**사용자 집 위치 찾기**: 브이월드 대신 **동 선택 + 지번 입력 → building 테이블에서 검색 → 중심점 사용** 방식으로 결정 (건물명 검색은 건물명이 비어 있는 경우가 많아 부적합)
+**사용자 집 위치 찾기** (두 가지)
+- **도로명주소(또는 지번주소) 검색**: `GET /api/address/search?query=` → 브이월드 검색 API(도로명, 없으면 지번) → 좌표(EPSG:5186) → building 외곽선 안의 건물, 없으면 30m 안 가장 가까운 건물 → 그 건물의 동·지번 (`address/AddressService`, 화면 `static/js/address.js`)
+- **동 선택 + 지번 입력** → building 테이블 검색 (주소 검색 키가 없을 때도 동작)
+- 건물명 검색은 건물명이 비어 있는 경우가 많아 쓰지 않음
 
 ### 5-2. 한국천문연구원 출몰시각
 - 지역별/위치별 조회, 응답: 일출·일몰, **시민박명(아침·저녁)**, 항해박명, 천문박명

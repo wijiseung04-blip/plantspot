@@ -3,6 +3,7 @@
 <head th:replace="~{fragments/layout :: head('우리 집')}"></head>
 <body>
 	<header th:replace="~{fragments/layout :: header}"></header>
+	<script th:src="@{/js/address.js}" defer></script>
 	<main>
 		<h1>우리 집</h1>
 		<p id="msg" class="flash err" hidden></p>
@@ -10,7 +11,8 @@
 
 		<h2>집 등록</h2>
 		<form id="house-form" class="card form">
-			<p class="muted">동을 고르고 지번을 입력하면 건물 데이터(사하구 41,271동)에서 우리 건물을 찾습니다.</p>
+			<p class="muted">도로명주소로 찾거나, 동을 고르고 지번을 입력하면 건물 데이터(부산 사하구)에서 우리 건물을 찾습니다.</p>
+			<div id="address-box"></div>
 			<div class="row">
 				<label>동 <select name="dong" id="dong" required></select></label>
 				<label>지번 <input name="jibun" placeholder="예: 1160-6" required></label>
@@ -32,8 +34,15 @@
 				const dongs = await api('/api/buildings/dongs');
 				document.getElementById('dong').innerHTML = dongs.length
 					? dongs.map(d => `<option>${escapeHtml(d)}</option>`).join('')
-					: '<option value="">건물 데이터 없음 (관리자가 가져오기 필요)</option>';
+					: '<option value="">건물 데이터 없음 (importBuildings 로 먼저 가져오기)</option>';
 			} catch (e) { show(e); }
+
+			addressSearch(document.getElementById('address-box'), (b) => {
+				selectDong(document.getElementById('dong'), b.dong);
+				document.querySelector('#house-form [name=jibun]').value = b.jibun;
+				const name = document.querySelector('#house-form [name=name]');
+				if (!name.value) name.value = b.roadAddress || '우리 집';
+			});
 
 			async function load() {
 				const houses = await api('/api/houses');

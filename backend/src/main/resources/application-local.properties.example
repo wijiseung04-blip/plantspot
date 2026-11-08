@@ -9,8 +9,10 @@ api.kma.station-id=159
 # ===== 농사로 (승인 후) =====
 api.nongsaro.api-key=
 
-# ===== 브이월드 (선택) =====
+# ===== 브이월드 주소 검색 (도로명주소로 건물 찾기) =====
 api.vworld.key=
+# 키 발급 때 등록한 서비스 URL (필요할 때만, 예: http://localhost:8080)
+api.vworld.domain=
 
 # ===== 첫 관리자 계정 (관리자가 없을 때만 만든다) =====
 app.admin.login-id=admin
