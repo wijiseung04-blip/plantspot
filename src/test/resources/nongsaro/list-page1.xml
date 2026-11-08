@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 테스트용 가상 응답 (매뉴얼의 형식만 따름, 값은 실제 데이터가 아님) -->
+<response>
+	<header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE.</resultMsg></header>
+	<body>
+		<items>
+			<item>
+				<cntntsNo>90001</cntntsNo>
+				<cntntsSj>테스트덩굴</cntntsSj>
+				<rtnFileCours>cms_contents/301|cms_contents/301</rtnFileCours>
+				<rtnStreFileNm>t1.jpg|t2.jpg</rtnStreFileNm>
+				<rtnThumbFileNm>t1_s.jpg|t2_s.jpg</rtnThumbFileNm>
+			</item>
+			<item>
+				<cntntsNo>90002</cntntsNo>
+				<cntntsSj>테스트선인장</cntntsSj>
+				<rtnThumbFileUrl>http://example.org/thumb.jpg</rtnThumbFileUrl>
+			</item>
+			<numOfRows>2</numOfRows>
+			<pageNo>1</pageNo>
+			<totalCount>3</totalCount>
+		</items>
+	</body>
+</response>

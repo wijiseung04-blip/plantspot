@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 테스트용 가상 응답 -->
+<response>
+	<header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE.</resultMsg></header>
+	<body><items>
+		<item><cntntsNo>90003</cntntsNo><cntntsSj>테스트고사리</cntntsSj></item>
+		<numOfRows>2</numOfRows><pageNo>2</pageNo><totalCount>3</totalCount>
+	</items></body>
+</response>

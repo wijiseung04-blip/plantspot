@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 테스트용 가상 응답 -->
+<response>
+	<header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE.</resultMsg></header>
+	<body><item>
+		<plntbneNm>Testus vinus</plntbneNm>
+		<plntzrNm>Test vine</plntzrNm>
+		<fmlCodeNm>테스트과</fmlCodeNm>
+		<lighttdemanddoCode>055001,055002</lighttdemanddoCode>
+		<lighttdemanddoCodeNm>낮은 광도(300~800 Lux),중간 광도(800~1,500 Lux)</lighttdemanddoCodeNm>
+		<postngplaceCode>064003,064002</postngplaceCode>
+		<postngplaceCodeNm>거실 창측,거실 내측</postngplaceCodeNm>
+		<winterLwetTpCode>057003</winterLwetTpCode>
+		<winterLwetTpCodeNm>7℃</winterLwetTpCodeNm>
+		<managelevelCode>089001</managelevelCode>
+		<managelevelCodeNm>초보자</managelevelCodeNm>
+		<watercycleWinterCodeNm>토양 표면이 말랐을때 충분히 관수함</watercycleWinterCodeNm>
+		<adviseInfo>테스트용 관리 요령</adviseInfo>
+	</item></body>
+</response>
