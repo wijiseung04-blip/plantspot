@@ -79,7 +79,7 @@ data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 J
 테스트도 같은 계층 패키지(`src/test/java/com/springboot/controller|service|calculator|client|tool`, 공용 도구는 `support`).
 `src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
-**데이터 생성 프로그램 (① — 웹 서버 없이 실행 후 종료, DB 설정은 backend의 properties)**
+**데이터 생성 프로그램 (① tool 패키지 — 웹 서버 없이 실행 후 종료, DB 설정은 application.properties)**
 - `./gradlew importBuildings -Pgpkg=경로` / `./gradlew importPlants` / `./gradlew collectWeather -Pfrom= -Pto=`
 
 **주의할 점 (작업하며 확인한 것)**
