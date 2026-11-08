@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,17 +39,16 @@ public class HouseService {
 	private final RoomWindowRepository windows;
 	private final BuildingService buildingService;
 	private final MemberService memberService;
-	private final com.plantspot.obstruction.ObstructionAngleRepository obstructions;
+	private final ApplicationEventPublisher events;
 
 	public HouseService(HouseRepository houses, RoomRepository rooms, RoomWindowRepository windows,
-			BuildingService buildingService, MemberService memberService,
-			com.plantspot.obstruction.ObstructionAngleRepository obstructions) {
+			BuildingService buildingService, MemberService memberService, ApplicationEventPublisher events) {
 		this.houses = houses;
 		this.rooms = rooms;
 		this.windows = windows;
 		this.buildingService = buildingService;
 		this.memberService = memberService;
-		this.obstructions = obstructions;
+		this.events = events;
 	}
 
 	// ----- 집 -----
@@ -84,8 +84,8 @@ public class HouseService {
 		house.update(req.name().trim(), req.floor(),
 				req.floorHeight() != null ? req.floorHeight() : house.getFloorHeight());
 		if (house.floorElevation() != oldElevation) {
-			// 눈 높이가 바뀌었으니 건물 데이터 가림 각도는 다음 조회 때 다시 계산
-			obstructions.deleteByHouseAndSource(house.getId(), com.plantspot.obstruction.ObstructionSource.BUILDING);
+			// 눈 높이가 바뀌었으니 가림 각도·햇빛 계산을 다시 해야 한다
+			events.publishEvent(new HouseEvents.HouseChanged(house.getId()));
 		}
 		return HouseResponse.of(house);
 	}
@@ -93,7 +93,10 @@ public class HouseService {
 	@Transactional
 	public void deleteHouse(LoginMember me, Long houseId) {
 		House house = loadHouse(me, houseId);
-		obstructions.deleteByHouse(houseId);
+		for (Room room : house.getRooms()) {
+			events.publishEvent(new HouseEvents.RoomDeleting(room.getId()));
+		}
+		events.publishEvent(new HouseEvents.HouseDeleting(houseId));
 		houses.delete(house);
 		log.info("집 삭제: {} (회원 {})", houseId, me.getUsername());
 	}
@@ -135,12 +138,14 @@ public class HouseService {
 			validateWindow(room, w.getWallIndex(), w.getOffset(), w.getWidth(), w.getHeight(), w.getSillHeight());
 			w.recalculateAzimuth();
 		}
+		events.publishEvent(new HouseEvents.RoomChanged(roomId));
 		return RoomResponse.of(room);
 	}
 
 	@Transactional
 	public void deleteRoom(LoginMember me, Long roomId) {
 		Room room = loadRoom(me, roomId);
+		events.publishEvent(new HouseEvents.RoomDeleting(roomId));
 		room.getHouse().getRooms().remove(room);
 	}
 
@@ -158,6 +163,7 @@ public class HouseService {
 		RoomWindow window = new RoomWindow(room, req.wallIndex(), req.offset(), req.width(), req.height(),
 				req.sillHeight());
 		room.getWindows().add(window);
+		events.publishEvent(new HouseEvents.RoomChanged(roomId));
 		return WindowResponse.of(windows.save(window));
 	}
 
@@ -177,12 +183,14 @@ public class HouseService {
 		RoomWindow window = loadWindow(me, windowId);
 		validateWindow(window.getRoom(), req.wallIndex(), req.offset(), req.width(), req.height(), req.sillHeight());
 		window.update(req.wallIndex(), req.offset(), req.width(), req.height(), req.sillHeight());
+		events.publishEvent(new HouseEvents.RoomChanged(window.getRoom().getId()));
 		return WindowResponse.of(window);
 	}
 
 	@Transactional
 	public void deleteWindow(LoginMember me, Long windowId) {
 		RoomWindow window = loadWindow(me, windowId);
+		events.publishEvent(new HouseEvents.RoomChanged(window.getRoom().getId()));
 		window.getRoom().getWindows().remove(window);
 	}
 

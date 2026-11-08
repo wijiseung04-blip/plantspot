@@ -6,12 +6,15 @@ import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.plantspot.building.Building;
 import com.plantspot.building.BuildingRepository;
 import com.plantspot.house.House;
+import com.plantspot.house.HouseEvents;
 import com.plantspot.house.HouseService;
 import com.plantspot.member.LoginMember;
 import com.plantspot.obstruction.ObstructionCalculator.Obstacle;
@@ -32,12 +35,25 @@ public class ObstructionService {
 	private final ObstructionAngleRepository repository;
 	private final BuildingRepository buildings;
 	private final HouseService houseService;
+	private final ApplicationEventPublisher events;
 
 	public ObstructionService(ObstructionAngleRepository repository, BuildingRepository buildings,
-			HouseService houseService) {
+			HouseService houseService, ApplicationEventPublisher events) {
 		this.repository = repository;
 		this.buildings = buildings;
 		this.houseService = houseService;
+		this.events = events;
+	}
+
+	/** 층이 바뀌면 건물 데이터 값을 지워 다음 조회 때 다시 계산한다. */
+	@EventListener
+	public void onHouseChanged(HouseEvents.HouseChanged e) {
+		repository.deleteByHouseAndSource(e.houseId(), ObstructionSource.BUILDING);
+	}
+
+	@EventListener
+	public void onHouseDeleting(HouseEvents.HouseDeleting e) {
+		repository.deleteByHouse(e.houseId());
 	}
 
 	/** 집 위치·층에서 본 건물 데이터 스카이라인 (저장하지 않음, 비회원 간단 예측에도 사용). */
@@ -74,6 +90,7 @@ public class ObstructionService {
 					sky.causeIds()[i] >= 0 ? sky.distances()[i] : null));
 		}
 		repository.saveAll(rows);
+		events.publishEvent(new ObstructionChanged(house.getId()));
 		log.info("가림 각도 계산: 집 {} (눈 높이 {}m)", house.getId(), eyeHeight(house));
 	}
 
@@ -135,6 +152,7 @@ public class ObstructionService {
 			repository.flush();
 			repository.save(new ObstructionAngle(house, bin, m.angleDeg(), ObstructionSource.SENSOR, null, null));
 		}
+		events.publishEvent(new ObstructionChanged(houseId));
 		log.info("실측 가림 각도 저장: 집 {} {}개 방향", houseId, measured.size());
 		return view(house);
 	}
@@ -143,7 +161,12 @@ public class ObstructionService {
 	public List<ObstructionView> clearMeasured(LoginMember me, Long houseId) {
 		House house = houseService.loadHouse(me, houseId);
 		repository.deleteByHouseAndSource(houseId, ObstructionSource.SENSOR);
+		events.publishEvent(new ObstructionChanged(houseId));
 		return view(house);
+	}
+
+	/** 가림 각도가 바뀜 → 그 집 방들의 햇빛 계산이 낡음 */
+	public record ObstructionChanged(Long houseId) {
 	}
 
 	private static double round(double v) {
