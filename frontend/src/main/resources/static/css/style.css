@@ -69,3 +69,4 @@ th { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 .row > * { flex: 1 1 160px; }
 .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); }
 .badge.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+button:disabled, .button:disabled { opacity: 0.4; cursor: not-allowed; }

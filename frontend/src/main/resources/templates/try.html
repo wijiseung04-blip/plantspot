@@ -3,12 +3,14 @@
 <head th:replace="~{fragments/layout :: head('간단 예측')}"></head>
 <body>
 	<header th:replace="~{fragments/layout :: header}"></header>
+	<script th:src="@{/js/address.js}" defer></script>
 	<main>
 		<h1>회원가입 없이 간단 예측</h1>
-		<p class="muted">우리 건물(동·지번), 층, 창 방향만 알려주세요. 주변 건물 높이로 가림을 계산해
+		<p class="muted">우리 건물(도로명주소 또는 동·지번), 층, 창 방향만 알려주세요. 주변 건물 높이로 가림을 계산해
 			표준 방(4m × 3.5m, 창 180 × 150cm)에 계절별로 햇빛이 얼마나 드는지 보여드립니다.</p>
 		<p id="msg" class="flash err" hidden></p>
 		<form id="form" class="card form">
+			<div id="address-box"></div>
 			<div class="row">
 				<label>동 <select name="dong" id="dong" required></select></label>
 				<label>지번 <input name="jibun" placeholder="예: 1160-6" required></label>
@@ -52,8 +54,15 @@
 			const LV = { BRIGHT: '밝음', MEDIUM: '보통', DIM: '어두움' };
 			try {
 				const dongs = await api('/api/buildings/dongs');
-				document.getElementById('dong').innerHTML = dongs.map(d => `<option ${d === '하단동' ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('');
+				document.getElementById('dong').innerHTML = dongs.length
+					? dongs.map(d => `<option ${d === '하단동' ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('')
+					: '<option value="">건물 데이터 없음 (importBuildings 로 먼저 가져오기)</option>';
 			} catch (e) { show(e); }
+
+			addressSearch(document.getElementById('address-box'), (b) => {
+				selectDong(document.getElementById('dong'), b.dong);
+				document.querySelector('#form [name=jibun]').value = b.jibun;
+			});
 
 			function polar(az, alt) { const r = 100 * (90 - alt) / 90, t = az * Math.PI / 180; return [r * Math.sin(t), -r * Math.cos(t)]; }
 			function drawSky(sky, windowAz) {
