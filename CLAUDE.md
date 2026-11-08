@@ -30,35 +30,44 @@
 
 **설계 원칙**: 모든 기능은 위 항목 중 어디에 해당하는지 설명할 수 있어야 한다.
 
-## 3. 기술 환경과 구조 (프로젝트 하나, 안에서 backend / frontend 나눔)
+## 3. 기술 환경과 구조 (교과서 3계층: controller → service → repository → domain)
 
 - **Spring Boot 4.1.x** (Spring Framework 7, Spring Security 7, Hibernate 7), **Java 26** (Gradle toolchain, JDK 26이 없으면 `-PjavaVersion=25`)
 - **Gradle 단일 프로젝트, 서버 하나(포트 8080)**. 반드시 `gradlew` 사용 (Gradle 9.8.2 — 이클립스 Gradle 설정은 "Gradle wrapper")
 - IDE: **이클립스**(Buildship) — plantspot 폴더를 Gradle 프로젝트로 가져온다
 - DB: **SQLite 파일** `data/plantspot.db` (`hibernate-community-dialects`의 `SQLiteDialect`, 커넥션 1개). 테스트는 메모리 SQLite
+- 기본 패키지 **`com.springboot`** (수업 프로젝트와 같은 형태). 평가 기준 "구조(10점): 3계층 + 도메인 + DB"가 패키지만 봐도 보이게 계층별로 나눈다
 
 ```
-plantspot/
-├── build.gradle, settings.gradle, gradlew
-├── data/plantspot.db         DB 파일 (처음 실행할 때 자동 생성, 테이블은 JPA가 만듦, git 제외)
-└── src/main/
-    ├── java/com/plantspot/
-    │   ├── PlantSpotApplication.java
-    │   ├── backend/          REST API·계산·DB·보안 — api(컨트롤러) → Service → Repository(JPA) → SQLite
-    │   └── frontend/         화면 컨트롤러 (PageController: 화면 주소 → 템플릿, Codes: 선택 목록)
-    └── resources/
-        ├── templates/        화면 (Thymeleaf)
-        ├── static/           css, js(api.js 등), editor/ (② 평면도 햇빛 에디터)
-        └── application.properties (+ application-local.properties: API 키·관리자 비밀번호, 커밋 금지)
+src/main/java/com/springboot
+├── PlantSpotApplication.java
+├── controller/   (MVC) REST 컨트롤러 /api/** + PageController(화면 주소 → 템플릿) + Codes(화면 선택 목록)
+├── service/      (비즈니스) 집·방·햇빛·추천·식물·파일·회원·공공데이터·리포트 서비스
+├── repository/   (퍼시스턴트) Spring Data JPA 리포지토리
+├── domain/       JPA 엔티티·enum (Member, Building, House, Room, RoomWindow, PlantSpecies, SunlightCell …)
+├── dto/          요청·응답 객체 (HouseRequests, HouseResponses, SignupForm …)
+├── calculator/   계산 로직 (SolarCalculator, ObstructionCalculator, SunlightCalculator, PlantScorer, TmConverter …)
+├── client/       외부 API 호출 (농사로·천문연·기상청·브이월드)
+├── report/       PDF·PNG 만들기 (PdfWriter, RoomPlanRenderer, KoreanFont)
+├── tool/         ① 데이터 생성 프로그램 (BuildingImporter, PlantImportRunner, WeatherCollectRunner, GpkgGeometryReader)
+├── config/       SecurityConfig, PasswordConfig, AdminInitializer, DataDirectoryInitializer
+├── security/     LoginMember (로그인 회원)
+├── event/        HouseEvents, PlantEvents (계산 결과를 낡게 만드는 변경 알림)
+└── exception/    예외·GlobalExceptionHandler·ErrorResponse
+src/main/resources
+├── templates/    화면 (Thymeleaf)
+├── static/       css, js(api.js 등), editor/ (② 평면도 햇빛 에디터)
+└── application.properties (+ application-local.properties: API 키·관리자 비밀번호, 커밋 금지)
+data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 JPA가 만듦, git 제외)
 ```
 
-- 화면(templates·static·frontend 패키지)은 데이터를 직접 읽지 않고, 화면 스크립트가 `/api/**`(backend 패키지)를 부른다
+- 화면(templates·static)은 데이터를 직접 읽지 않고, 화면 스크립트가 `/api/**`(REST 컨트롤러)를 부른다
 - 로그인: `POST /api/auth/login` (JSON, 세션 쿠키), 가입 `POST /api/auth/signup`, 로그아웃 `POST /api/auth/logout`
-- 권한(`backend/config/SecurityConfig`): 화면 `/my/**` 회원(아니면 로그인 화면으로), `/admin/**` 관리자(아니면 403), `/api/**` 는 401·403 JSON
+- 권한(`config/SecurityConfig`): 화면 `/my/**` 회원(아니면 로그인 화면으로), `/admin/**` 관리자(아니면 403), `/api/**` 는 401·403 JSON
 - CSRF: `XSRF-TOKEN` 쿠키, 화면 `static/js/api.js` 가 `GET /api/auth/csrf` 로 토큰을 받아 헤더에 붙임
 - 화면 머리글의 로그인 표시는 PageController 의 model `me`(LoginMember: me.nickname, me.admin)
 
-**실행**: `PlantSpotApplication` 실행 → 브라우저 http://localhost:8080
+**실행**: `com.springboot.PlantSpotApplication` 실행 → 브라우저 http://localhost:8080
 
 **Spring Boot 4 주의사항**
 - 웹 스타터는 `spring-boot-starter-webmvc` (`starter-web` 아님), 테스트 스타터는 기능별(`webmvc-test` 등), `@MockBean` → `@MockitoBean`
@@ -66,33 +75,11 @@ plantspot/
 
 ## 4. 현재 코드 상태 (아두이노 전까지 구현)
 
-빌드·테스트: `./gradlew build` (단위·API·화면 테스트). 서버를 실행해 브라우저로도 확인함.
+빌드·테스트: `./gradlew build` (단위·API·화면 테스트 147개). 서버를 실행해 브라우저로도 확인함.
+테스트도 같은 계층 패키지(`src/test/java/com/springboot/controller|service|calculator|client|tool`, 공용 도구는 `support`).
+`src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
-```
-src/main/java/com/plantspot/backend
-├── config/        SecurityConfig(비회원/회원/관리자, 화면·API 권한, CSRF 쿠키), PasswordConfig, DataDirectoryInitializer
-├── common/        NotFound/Forbidden/Conflict/Unavailable 예외, GlobalExceptionHandler, ErrorResponse
-├── member/        회원가입·로그인, Role(USER/ADMIN), AdminInitializer(app.admin.password 로 첫 관리자)
-├── sun/           SolarCalculator(NOAA), SunService
-├── geo/           TmConverter(EPSG:5186↔위경도), Wkt
-├── building/      Building(용도 칸 이름 building_usage), HeightRule, BuildingService
-├── house/         House, Room, RoomWindow(테이블 room_window — WINDOW는 예약어), HouseEvents
-├── obstruction/   ObstructionCalculator, obstruction_angle(BUILDING/SENSOR)
-├── sunlight/      SunlightCalculator, sunlight_cell / sunlight_summary
-├── plant/         농사로 가져오기, PlantConverter(변환표), plant_species
-├── weather/       sun_event, weather_hour, 맑은 시간·자연광 판단
-├── recommend/     PlantScorer, recommendation, my_plant(알림), PreviewService(비회원 간단 예측)
-├── address/       도로명주소 → 건물 찾기 (VworldAddressApi, AddressService)
-├── file/          upload_file + FileStorage(data/uploads)
-├── report/        리포트 PDF(PDFBox + 한글 글꼴), 배치도 PNG, CSV
-├── tool/          BuildingImporter(GeoPackage → building 테이블), GpkgGeometryReader
-└── api/           REST 컨트롤러 (/api/**)
-src/main/java/com/plantspot/frontend   PageController, Codes
-src/main/resources/templates, static   화면
-src/test/js/editor-parity.js           브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
-```
-
-**데이터 생성 프로그램 (① — 웹 서버 없이 실행 후 종료, DB 설정은 backend의 properties)**
+**데이터 생성 프로그램 (① tool 패키지 — 웹 서버 없이 실행 후 종료, DB 설정은 application.properties)**
 - `./gradlew importBuildings -Pgpkg=경로` / `./gradlew importPlants` / `./gradlew collectWeather -Pfrom= -Pto=`
 
 **주의할 점 (작업하며 확인한 것)**
@@ -248,9 +235,10 @@ GET  /api/rooms/{id}/report            (PDF 다운로드)
 ## 11. 작업 규칙
 
 - **비밀 정보 커밋 금지**: `application-local.properties`, API 키
+- 새 클래스는 역할에 맞는 계층 패키지에 둔다 (엔티티 → domain, 리포지토리 → repository, 서비스 → service, 컨트롤러 → controller)
 - `.gitignore`에 포함: `.gradle/`, `build/`, `bin/`, `.project`, `.classpath`, `.settings/`, `.idea/`, `**/application-local.properties`, `data/*.db`, `data/uploads/`
 - 제출할 때는 데이터를 넣은 `data/plantspot.db` 를 따로 낸다(저장소에는 올리지 않음)
-- 화면 변경은 frontend(templates·static·frontend 패키지), 데이터·계산·권한 변경은 backend 패키지. API를 바꾸면 화면 스크립트도 함께 확인
+- 화면 변경은 templates·static·PageController, API를 바꾸면 화면 스크립트도 함께 확인
 - Git: 원격 `https://github.com/wijiseung04-blip/plantspot.git`, 기본 브랜치는 **main**으로 맞추는 중 (이전에 main/master가 갈라지는 문제가 있었음)
 - 같은 이클립스 워크스페이스에 다른 과제 프로젝트(StudyMateProject 등)가 있음 → **plantspot 외 프로젝트는 건드리지 말 것**
 - 각 기능을 추가할 때 평가 기준 항목(필수 / ① / ②)과의 연결을 주석이나 커밋 메시지에 남기기
@@ -271,5 +259,5 @@ GET  /api/rooms/{id}/report            (PDF 다운로드)
 1. `src/main/resources/application-local.properties.example` → 같은 폴더에 `application-local.properties` 로 복사, 키·관리자 비밀번호 입력
 2. Window → Preferences → Gradle → Gradle distribution: **Gradle wrapper**
 3. File → Import → Gradle → Existing Gradle Project → **plantspot 폴더**
-4. `com.plantspot.PlantSpotApplication` 우클릭 → Run As → Java Application
+4. `com.springboot.PlantSpotApplication` 우클릭 → Run As → Java Application
 5. 브라우저 http://localhost:8080 (DB 파일은 data/plantspot.db 에 자동 생성)

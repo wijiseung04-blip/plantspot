@@ -1,5 +1,5 @@
 // 화면에서 REST API를 부를 때 쓰는 공통 함수.
-// /api/** 는 같은 서버의 backend 패키지(REST API)가 처리한다. 로그인은 세션 쿠키, 쓰기 요청은 CSRF 토큰 헤더가 필요하다.
+// /api/** 는 같은 서버의 REST 컨트롤러(com.springboot.controller)가 처리한다. 로그인은 세션 쿠키, 쓰기 요청은 CSRF 토큰 헤더가 필요하다.
 (function () {
 	let csrf = null; // { headerName, token }
 
