@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title th:text="${title} + ' · plantspot'">plantspot</title>
+<link rel="stylesheet" th:href="@{/css/style.css}">
+<script th:src="@{/js/api.js}" defer></script>
+</head>
+<body>
+	<header th:fragment="header" class="site-header">
+		<a class="brand" th:href="@{/}">🌱 plantspot</a>
+		<nav>
+			<a th:href="@{/try}">간단 예측</a>
+			<a th:href="@{/editor}">햇빛 에디터</a>
+			<a th:href="@{/plants}">식물 검색</a>
+			<th:block th:if="${me != null}">
+				<a th:href="@{/my/houses}">우리 집</a>
+				<a th:href="@{/my/plants}">내 식물</a>
+				<a th:href="@{/my/files}">내 파일</a>
+			</th:block>
+			<a th:if="${me != null and me.admin}" th:href="@{/admin}">관리</a>
+		</nav>
+		<div class="account">
+			<th:block th:if="${me != null}">
+				<span th:text="${me.nickname}">닉네임</span>님
+				<button type="button" class="link" onclick="logout()">로그아웃</button>
+			</th:block>
+			<th:block th:if="${me == null}">
+				<a th:href="@{/login}">로그인</a>
+				<a th:href="@{/signup}">회원가입</a>
+			</th:block>
+		</div>
+	</header>
+	<div th:fragment="flash">
+		<p class="flash ok" th:if="${message}" th:text="${message}"></p>
+		<p class="flash err" th:if="${error}" th:text="${error}"></p>
+	</div>
+</body>
+</html>

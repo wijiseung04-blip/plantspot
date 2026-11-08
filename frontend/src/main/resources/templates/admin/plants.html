@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('식물 변환표')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<h1>식물 변환표</h1>
+		<nav class="tabs" th:replace="~{admin/nav :: nav('plants')}"></nav>
+		<p id="msg" class="flash err" hidden></p>
+
+		<div class="card">
+			<h2 style="margin-top:0">농사로 데이터 가져오기</h2>
+			<p class="muted">저장된 식물 <strong id="count">0</strong>종. 목록 전체와 상세를 모두 받아 저장합니다(수 분 걸림).
+				관리자가 고친 변환값은 덮어쓰지 않습니다. 명령줄: <code>./gradlew importPlants</code></p>
+			<button type="button" id="import">가져오기 시작</button>
+			<span id="import-status" class="muted"></span>
+		</div>
+
+		<p class="muted">농사로 코드를 추천 기준값으로 바꾼 표입니다. 값을 고치면 '조정됨'으로 표시되고 다시 가져와도 유지됩니다.</p>
+		<form id="search" class="inline" style="margin-bottom:12px">
+			<input name="keyword" placeholder="이름 검색" style="width:200px">
+			<button type="submit" class="small">검색</button>
+		</form>
+		<div class="table-wrap">
+			<table>
+				<thead><tr><th>식물</th><th>빛 요구(원본)</th><th>최소 lux</th><th>최대 lux</th><th>직사광 최소(분)</th>
+					<th>직사광 최대(분)</th><th>창 거리 최소(cm)</th><th>창 거리 최대(cm)</th><th>겨울 최저(℃)</th><th></th></tr></thead>
+				<tbody id="rows"></tbody>
+			</table>
+		</div>
+
+		<h2>식물 직접 추가</h2>
+		<form id="add" class="card form">
+			<div class="row">
+				<label>이름 <input name="name" required maxlength="100"></label>
+				<label>최소 lux <input name="minLux" type="number" value="800" required></label>
+				<label>최대 lux <input name="maxLux" type="number" value="1500" required></label>
+				<label>직사광 최소(분) <input name="minDirectMinutes" type="number" value="0" required></label>
+				<label>직사광 최대(분) <input name="maxDirectMinutes" type="number"></label>
+				<label>겨울 최저(℃) <input name="winterMinTemp" type="number"></label>
+			</div>
+			<button type="submit">추가</button>
+		</form>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', () => {
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			const num = (v) => v === '' || v == null ? null : Number(v);
+			const fields = ['minLux', 'maxLux', 'minDirectMinutes', 'maxDirectMinutes', 'minWindowDistance', 'maxWindowDistance', 'winterMinTemp'];
+			let keyword = '';
+
+			async function load() {
+				const r = await api(`/api/plants?size=100&keyword=${encodeURIComponent(keyword)}`);
+				if (!keyword) document.getElementById('count').textContent = r.total;
+				document.getElementById('rows').innerHTML = r.items.map(p => `
+					<tr data-id="${p.id}">
+						<td><a href="/plants/${p.id}">${escapeHtml(p.name)}</a>${p.adjusted ? ' <span class="badge warn">조정됨</span>' : ''}${p.source === 'MANUAL' ? ' <span class="badge">직접</span>' : ''}</td>
+						<td class="muted">${escapeHtml(p.lightNames || '-')}</td>
+						${fields.map(f => `<td><input name="${f}" type="number" value="${p[f] ?? ''}" style="width:88px"></td>`).join('')}
+						<td style="white-space:nowrap"><button class="small" data-act="save">저장</button>
+							<button class="small secondary" data-act="reset">자동값</button>
+							<button class="small danger" data-act="del">삭제</button></td>
+					</tr>`).join('') || '<tr><td colspan="10" class="muted">식물이 없습니다.</td></tr>';
+			}
+			load().catch(show);
+
+			document.getElementById('search').addEventListener('submit', (ev) => { ev.preventDefault(); keyword = ev.target.keyword.value; load().catch(show); });
+
+			document.getElementById('rows').addEventListener('click', async (ev) => {
+				const act = ev.target.dataset.act; if (!act) return;
+				const tr = ev.target.closest('tr'), id = tr.dataset.id;
+				try {
+					if (act === 'save') {
+						const body = Object.fromEntries(fields.map(f => [f, num(tr.querySelector(`[name=${f}]`).value)]));
+						await api(`/api/admin/plants/${id}/conversion`, { method: 'PUT', json: body });
+					} else if (act === 'reset') {
+						await api(`/api/admin/plants/${id}/conversion/reset`, { method: 'POST' });
+					} else if (act === 'del') {
+						if (!confirm('삭제할까요?')) return;
+						await api(`/api/admin/plants/${id}`, { method: 'DELETE' });
+					}
+					msg.hidden = true; await load();
+				} catch (e) { show(e); }
+			});
+
+			document.getElementById('add').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const f = new FormData(ev.target);
+				try {
+					await api('/api/admin/plants', { method: 'POST', json: {
+						name: f.get('name'), minLux: num(f.get('minLux')), maxLux: num(f.get('maxLux')),
+						minDirectMinutes: num(f.get('minDirectMinutes')), maxDirectMinutes: num(f.get('maxDirectMinutes')),
+						winterMinTemp: num(f.get('winterMinTemp')) } });
+					ev.target.reset(); await load();
+				} catch (e) { show(e); }
+			});
+
+			const statusEl = document.getElementById('import-status');
+			async function poll() {
+				const s = await api('/api/admin/plants/import');
+				statusEl.textContent = s.running ? `진행 중 ${s.done}/${s.total} ${s.current || ''}`
+					: s.result ? `완료: ${s.result}` : s.error ? `실패: ${s.error}` : '';
+				if (s.running) setTimeout(() => poll().catch(show), 2000); else if (s.result) load().catch(show);
+			}
+			poll().catch(() => {});
+			document.getElementById('import').addEventListener('click', async () => {
+				try { await api('/api/admin/plants/import', { method: 'POST' }); } catch (e) { if (e.status !== 409) return show(e); }
+				poll().catch(show);
+			});
+		});
+	</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('회원가입')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main class="narrow">
+		<h1>회원가입</h1>
+		<p id="msg" class="flash err" hidden></p>
+		<form id="form" class="card">
+			<label>아이디 <input type="text" name="loginId" required placeholder="영문 소문자·숫자·밑줄 4~20자"></label>
+			<label>비밀번호 <input type="password" name="password" required placeholder="8~64자"></label>
+			<label>비밀번호 확인 <input type="password" name="passwordConfirm" required></label>
+			<label>닉네임 <input type="text" name="nickname" required maxlength="20"></label>
+			<button type="submit">가입</button>
+		</form>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', () => {
+			document.getElementById('form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const body = Object.fromEntries(new FormData(ev.target));
+				try {
+					await api('/api/auth/signup', { method: 'POST', json: body });
+					location.href = '/login?joined';
+				} catch (e) {
+					// 서버(Bean Validation) 오류 메시지를 줄마다 보여준다
+					const m = document.getElementById('msg');
+					m.innerHTML = e.message.split(', ').map(escapeHtml).join('<br>'); m.hidden = false;
+				}
+			});
+		});
+	</script>
+</body>
+</html>

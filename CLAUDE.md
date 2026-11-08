@@ -21,7 +21,7 @@
 - 3계층 구조: Controller → Service → Repository(JPA) → DB
 - REST 설계(자원 중심 URL), Bean Validation, 공통 예외 처리, 로그
 - 다국어 처리는 옵션
-- **DB는 `*.db` 파일로 제출** → SQLite 사용
+- DB 제출: 원래 기준은 `*.db` 파일 → **MySQL로 바꿨으므로 `mysqldump`로 만든 `.sql` 파일로 제출 가능한지 교수님께 확인할 것**
 
 **추가 점수 (가장 중요)**
 - **① DB 데이터 생성 프로그램 (20~30점)**: 센서 데이터 저장, 인터넷 공개 데이터를 원하는 형태의 DB로 전환, AI 등으로 분석 후 저장. 랜덤 데이터는 목적이 있을 때만 인정
@@ -30,74 +30,74 @@
 
 **설계 원칙**: 모든 기능은 위 항목 중 어디에 해당하는지 설명할 수 있어야 한다.
 
-## 3. 기술 환경
+## 3. 기술 환경과 구조 (backend / frontend 분리)
 
-- **Spring Boot 4.1.x** (Spring Framework 7, Spring Security 7, Hibernate 7)
-- **Java 26** (Gradle toolchain)
-- **Gradle + gradlew** (Spring Initializr로 생성). Spring Boot 4.1 플러그인은 Gradle 8.14+ 또는 9.x 필요 → 반드시 `gradlew` 사용
-- IDE: 사용자는 **이클립스**(Buildship)도 함께 사용
-- DB: SQLite (`data/plantspot.db`), `hibernate-community-dialects`의 `SQLiteDialect`
-- 화면: Thymeleaf
+- **Spring Boot 4.1.x** (Spring Framework 7, Spring Security 7, Hibernate 7), **Java 26** (Gradle toolchain, JDK 26이 없으면 `-PjavaVersion=25`)
+- **Gradle 멀티 프로젝트**: 루트 `settings.gradle` 이 `backend`, `frontend` 를 포함. 반드시 루트의 `gradlew` 사용
+- IDE: **이클립스**(Buildship) — 루트 폴더를 Gradle 프로젝트로 가져오면 plantspot / backend / frontend 세 프로젝트가 보인다
+- DB: **MySQL 8** (`plantspot` 데이터베이스, utf8mb4). 테스트는 H2(MySQL 호환 모드) 메모리 DB
+
+```
+plantspot/
+├── settings.gradle, build.gradle(플러그인 버전만), gradlew
+├── backend/   (포트 8081) REST API 전용 — Controller → Service → Repository(JPA) → MySQL
+│   ├── sql/create-database.sql      처음 한 번: DB·계정 만들기
+│   └── src/main/resources/application.properties (+ application-local.properties: DB 비밀번호·API 키, 커밋 금지)
+└── frontend/  (포트 8080) 화면 전용 — Thymeleaf 템플릿 + 정적 파일(js, css, editor), DB·보안 없음
+    ├── PageController     화면 주소 → 템플릿
+    ├── ApiProxyController 브라우저의 /api/** 를 backend로 그대로 전달 (쿠키·파일 포함)
+    └── LoginInterceptor   backend /api/members/me 로 로그인 확인 → /my/** 회원, /admin/** 관리자
+```
+
+- 브라우저는 **frontend(8080)만** 본다. 데이터는 화면 스크립트가 `/api/**` 로 요청 → frontend가 backend로 전달
+- 로그인: `POST /api/auth/login` (JSON, 세션 쿠키), 가입 `POST /api/auth/signup`, 로그아웃 `POST /api/auth/logout`
+- CSRF: backend가 `XSRF-TOKEN` 쿠키 사용, 화면 `static/js/api.js` 가 `GET /api/auth/csrf` 로 토큰을 받아 헤더에 붙임
+- 실제 데이터 보호(권한)는 backend가 한다. frontend의 LoginInterceptor는 화면 안내용
+
+**실행 순서**: MySQL 켜기 → backend 실행(8081) → frontend 실행(8080) → 브라우저 http://localhost:8080
 
 **Spring Boot 4 주의사항**
-- 웹 스타터는 `spring-boot-starter-webmvc` (`starter-web` 아님)
-- 테스트 스타터가 기능별로 나뉨: `webmvc-test`, `data-jpa-test`, `security-test`, `thymeleaf-test`
-- `@MockBean` 제거됨 → `@MockitoBean`
-- Thymeleaf 보안 확장은 `thymeleaf-extras-springsecurity6` (7은 Maven에 없음, Boot 4.1 BOM이 6을 관리)
+- 웹 스타터는 `spring-boot-starter-webmvc` (`starter-web` 아님), 테스트 스타터는 기능별(`webmvc-test` 등), `@MockBean` → `@MockitoBean`
+- Jackson 3 (`tools.jackson.*`)
 
-**목표 build.gradle 의존성**
-```gradle
-implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-implementation 'org.springframework.boot:spring-boot-starter-validation'
-implementation 'org.springframework.boot:spring-boot-starter-security'
-implementation 'org.xerial:sqlite-jdbc'
-implementation 'org.hibernate.orm:hibernate-community-dialects'   // 버전 못 찾으면 hibernate-core와 같은 버전 명시
-testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
-testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-```
-group은 `com.plantspot`. 건물 가져오기용 Gradle 작업 `importBuildings`(JavaExec, mainClass `com.plantspot.tool.BuildingImporter`, `-Pgpkg=경로`)도 추가할 것.
+## 4. 현재 코드 상태 (아두이노 전까지 구현, backend/frontend 분리 완료)
 
-## 4. 현재 코드 상태 (아두이노 전까지 구현 완료)
-
-빌드·테스트는 `./gradlew build` 로 확인됨(JDK 26이 없으면 `-PjavaVersion=25`). 계산 로직은 단위 테스트, API는 MockMvc 테스트로 검증.
-테스트 DB는 메모리 SQLite(`src/test/resources/application.properties`, ddl-auto=update).
+빌드·테스트: `./gradlew build` (backend 단위·API 테스트 + frontend 화면 테스트). MySQL 실제 연결·두 서버 함께 실행해 브라우저로도 확인함.
 
 ```
-com.plantspot
-├── config/        SecurityConfig(비회원/회원/관리자, /api/** 는 401·403 JSON, CSRF 켬), DataDirectoryInitializer
-├── common/        NotFound/Forbidden/Conflict/Unavailable 예외, GlobalExceptionHandler(REST), ErrorResponse
+backend/src/main/java/com/plantspot
+├── config/        SecurityConfig(웹 전용: 비회원/회원/관리자, 401·403 JSON, CSRF 쿠키), PasswordConfig
+├── common/        NotFound/Forbidden/Conflict/Unavailable 예외, GlobalExceptionHandler, ErrorResponse
 ├── member/        회원가입·로그인, Role(USER/ADMIN), AdminInitializer(app.admin.password 로 첫 관리자)
 ├── sun/           SolarCalculator(NOAA), SunService
 ├── geo/           TmConverter(EPSG:5186↔위경도), Wkt
-├── building/      Building, HeightRule, BuildingService (동·지번, 주변 건물)
-├── house/         House, Room(다각형 cm, 방향, 천장, 커튼, 겨울 최저 실내 온도), RoomWindow(테이블 room_window), HouseEvents
-├── obstruction/   ObstructionCalculator(외곽선 0.25m 샘플, 5° 72칸), obstruction_angle(BUILDING/SENSOR)
-├── sunlight/      SunlightCalculator(창 투영 직사광 + CIE 하늘 성분 + BRE 내부 반사), sunlight_cell / sunlight_summary
-├── plant/         농사로 XML·가져오기(PlantImportService, ./gradlew importPlants), PlantConverter(변환표), plant_species
-├── weather/       천문연 출몰시각 sun_event, 기상청 ASOS weather_hour, 맑은 시간·자연광 판단, ./gradlew collectWeather
-├── recommend/     PlantScorer(적합도), recommendation, my_plant(알림), PreviewService(비회원 간단 예측)
-├── file/          upload_file + FileStorage(data/uploads)
+├── building/      Building(칸 building_usage — USAGE는 MySQL 예약어), HeightRule, BuildingService
+├── house/         House, Room, RoomWindow(테이블 room_window — WINDOW는 예약어), HouseEvents
+├── obstruction/   ObstructionCalculator, obstruction_angle(BUILDING/SENSOR)
+├── sunlight/      SunlightCalculator, sunlight_cell / sunlight_summary
+├── plant/         농사로 가져오기, PlantConverter(변환표), plant_species
+├── weather/       sun_event, weather_hour, 맑은 시간·자연광 판단
+├── recommend/     PlantScorer, recommendation, my_plant(알림), PreviewService(비회원 간단 예측)
+├── file/          upload_file + FileStorage(backend/data/uploads)
 ├── report/        리포트 PDF(PDFBox + 한글 글꼴), 배치도 PNG, CSV
-├── tool/          BuildingImporter, GpkgGeometryReader (./gradlew importBuildings -Pgpkg=)
-└── web/           REST·화면 컨트롤러
-static/editor/     ② 평면도 햇빛 에디터 (solar.js·light.js = 서버와 같은 공식, node src/test/js/editor-parity.js 로 일치 확인)
+├── tool/          BuildingImporter(GeoPackage → MySQL), GpkgGeometryReader
+└── web/           REST 컨트롤러 (AuthApiController, AdminApiController 포함)
+frontend/src/main/resources
+├── templates/     화면 (fragments/layout.html 머리글은 model 'me' 로 로그인 표시)
+└── static/        css, js/api.js, js/roomplan.js, editor/ (② 평면도 햇빛 에디터)
+frontend/src/test/js/editor-parity.js   브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 ```
 
-**주의할 점 (작업하며 확인한 것)**
-- SQLite에서 id가 자동 번호(rowid)가 되려면 칸 타입이 정확히 `integer` → 모든 엔티티 id에 `@Column(columnDefinition = "integer")`. `SchemaTest`가 검사
-- 벌크 delete 쿼리 대신 엔티티 단위 삭제(`deleteAll(find...)`) — SQLite가 번호를 재사용해 영속성 컨텍스트와 충돌함
-- 계산 결과(가림 각도·칸별 햇빛·추천)는 HouseEvents/ObstructionChanged/PlantEvents 로 낡으면 지우고, 다음 조회 때 다시 계산
-- Thymeleaf `<script>` 안의 `[(`, `[[` 는 인라인 문법으로 해석됨 → 스크립트에 `th:inline="none"`
-- `thymeleaf-extras-springsecurity7` 은 Maven에 없음 → Boot 4.1 BOM이 관리하는 `springsecurity6` 사용
-- PDF 한글 글꼴: `app.report.font`(없으면 윈도 맑은 고딕 → 맥 → 리눅스 나눔·Noto 순으로 찾음)
+**데이터 생성 프로그램 (① — 웹 서버 없이 실행 후 종료, DB 설정은 backend의 properties)**
+- `./gradlew :backend:importBuildings -Pgpkg=경로` / `./gradlew :backend:importPlants` / `./gradlew :backend:collectWeather -Pfrom= -Pto=`
 
-**확인용 API (일부)**
-- `GET /api/sun?dateTime=2026-12-21T12:30[&lat=&lon=]`, `GET /api/buildings?dong=하단동&jibun=1160-6`, `GET /api/buildings/nearby?...&radius=150`
+**주의할 점 (작업하며 확인한 것)**
+- 벌크 delete 쿼리 대신 엔티티 단위 삭제(`deleteAll(find...)`) 사용 중 (SQLite 시절 이유였지만 영속성 컨텍스트와 어긋나지 않아 그대로 둠)
+- 계산 결과(가림 각도·칸별 햇빛·추천)는 HouseEvents/ObstructionChanged/PlantEvents 로 낡으면 지우고 다음 조회 때 다시 계산
+- Thymeleaf `<script>` 안의 `[(`, `[[` 는 인라인 문법 → 스크립트에 `th:inline="none"`
+- frontend는 multipart를 해석하지 않는다(`spring.servlet.multipart.enabled=false`) — 업로드 본문을 그대로 backend에 넘기기 위해
+- 건물을 다시 가져올 때 house.building_id 를 끊었다가 동·지번으로 다시 연결한다(외래 키 때문)
+- PDF 한글 글꼴: `app.report.font`(없으면 윈도 맑은 고딕 → 맥 → 리눅스 나눔·Noto 순)
 
 **검증된 기준값** (테스트 기대값으로 사용 중)
 - 부산(35.10N, 128.97E) 정오 최고 고도: 춘분 54.7°, 하지 78.3°, 동지 31.5°, 방위각 약 180°
@@ -108,7 +108,7 @@ static/editor/     ② 평면도 햇빛 에디터 (solar.js·light.js = 서버�
 
 ## 5. 데이터 소스
 
-API 키는 `src/main/resources/application-local.properties`에 둔다 (`.gitignore` 대상, 절대 커밋 금지).
+API 키·DB 비밀번호는 `backend/src/main/resources/application-local.properties`에 둔다 (`.gitignore` 대상, 절대 커밋 금지, 예시는 같은 폴더의 `.example`).
 `application.properties`에서 `spring.config.import=optional:classpath:application-local.properties`로 읽는다.
 
 | 데이터 | 방식 | 상태 | 키 이름 |
@@ -238,8 +238,8 @@ GET  /api/rooms/{id}/report            (PDF 다운로드)
 ## 11. 작업 규칙
 
 - **비밀 정보 커밋 금지**: `application-local.properties`, API 키
-- `.gitignore`에 포함: `.gradle/`, `build/`, `bin/`, `.project`, `.classpath`, `.settings/`, `.idea/`, `data/*.db`, `src/main/resources/application-local.properties`
-- `data/` 폴더는 존재해야 함(SQLite 파일 위치). 없으면 생성
+- `.gitignore`에 포함: `.gradle/`, `build/`, `bin/`, `.project`, `.classpath`, `.settings/`, `.idea/`, `**/application-local.properties`, `backend/data/uploads/`
+- 화면 변경은 frontend, 데이터·계산·권한 변경은 backend. API를 바꾸면 frontend의 화면 스크립트도 함께 확인
 - Git: 원격 `https://github.com/wijiseung04-blip/plantspot.git`, 기본 브랜치는 **main**으로 맞추는 중 (이전에 main/master가 갈라지는 문제가 있었음)
 - 같은 이클립스 워크스페이스에 다른 과제 프로젝트(StudyMateProject 등)가 있음 → **plantspot 외 프로젝트는 건드리지 말 것**
 - 각 기능을 추가할 때 평가 기준 항목(필수 / ① / ②)과의 연결을 주석이나 커밋 메시지에 남기기
@@ -255,9 +255,11 @@ GET  /api/rooms/{id}/report            (PDF 다운로드)
 - [ ] CDS 센서 창틀 직사광 포화 테스트
 - [ ] 사하구 GeoPackage 경로 확인 후 `BuildingImporter` 실행 (기대: 41,271동)
 
-## 13. 첫 작업 제안
+## 13. 이클립스에서 실행
 
-1. `build.gradle`을 3장의 목표 의존성으로 맞추고 `./gradlew build` → 컴파일·테스트 오류 수정
-2. `data/` 폴더 확인 후 `BuildingImporter` 실행해 사하구 건물 적재 (4장 기준값과 일치하는지 확인)
-3. 서버 실행 후 확인용 API 3개 동작 확인
-4. 2단계(회원·권한) 착수
+1. MySQL에서 `backend/sql/create-database.sql` 실행 (비밀번호 바꿔서)
+2. `backend/src/main/resources/application-local.properties.example` → 같은 폴더에 `application-local.properties` 로 복사, DB 비밀번호·키 입력
+3. File → Import → Gradle → Existing Gradle Project → **plantspot 루트 폴더**
+4. backend: `com.plantspot.PlantSpotApplication` 우클릭 → Run As → Java Application (8081)
+5. frontend: `com.plantspot.front.PlantspotFrontendApplication` 우클릭 → Run As → Java Application (8080)
+6. 브라우저 http://localhost:8080

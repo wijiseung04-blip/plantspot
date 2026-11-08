@@ -1,0 +1,24 @@
+# 이 파일을 같은 폴더에 application-local.properties 로 복사한 뒤 값을 채운다. (커밋 금지)
+
+# ===== MySQL =====
+spring.datasource.username=plantspot
+spring.datasource.password=여기에_DB_비밀번호
+
+# ===== 공공데이터포털 (일반 인증키 Decoding 값) =====
+api.kasi.service-key=
+api.kma.service-key=
+# 부산 ASOS 지점 번호 (활용가이드에서 확인)
+api.kma.station-id=159
+
+# ===== 농사로 (승인 후) =====
+api.nongsaro.api-key=
+
+# ===== 브이월드 (선택) =====
+api.vworld.key=
+
+# ===== 첫 관리자 계정 (관리자가 없을 때만 만든다) =====
+app.admin.login-id=admin
+app.admin.password=
+
+# ===== PDF 리포트 한글 글꼴 (.ttf/.ttc, 비우면 맑은 고딕 등 자동 탐색) =====
+app.report.font=
