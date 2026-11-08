@@ -9,6 +9,18 @@
 		<p id="info" class="muted"></p>
 		<p id="msg" class="flash err" hidden></p>
 
+		<h2>창밖 스카이라인 (방향별 가림 각도)</h2>
+		<div class="row">
+			<div class="card" style="max-width:420px"><svg id="skyline" viewBox="-120 -120 240 240" style="width:100%"></svg></div>
+			<div class="card">
+				<p class="muted">우리 층 창 높이에서 본 주변 건물의 가림 각도입니다. 가운데가 머리 위(90°), 바깥 원이 지평선(0°)입니다.
+					색칠된 부분이 건물에 가려진 하늘입니다.</p>
+				<p><span class="badge">건물 데이터</span> 공공 건물 높이로 계산 · <span class="badge warn">실측</span> 센서로 보정된 방향</p>
+				<p id="sky-summary" class="muted"></p>
+				<button type="button" id="recalc" class="small secondary">건물 데이터로 다시 계산</button>
+			</div>
+		</div>
+
 		<h2>방</h2>
 		<div id="rooms" class="grid"></div>
 
@@ -72,6 +84,30 @@
 			}
 			load().catch(show);
 
+			function polar(az, alt) { // 방위각·고도 → 원 그림 좌표 (북쪽이 위)
+				const r = 100 * (90 - alt) / 90, t = az * Math.PI / 180;
+				return [r * Math.sin(t), -r * Math.cos(t)];
+			}
+			async function loadSky(recalc) {
+				const sky = recalc ? await api(`/api/houses/${id}/obstructions/recalculate`, { method: 'POST' })
+					: await api(`/api/houses/${id}/obstructions`);
+				let s = '';
+				[0, 30, 60].forEach(a => s += `<circle r="${100 * (90 - a) / 90}" fill="none" stroke="var(--line)"/>`);
+				['북', '동', '남', '서'].forEach((n, i) => { const [x, y] = polar(i * 90, -12); s += `<text x="${x}" y="${y + 4}" font-size="11" text-anchor="middle" fill="var(--muted)">${n}</text>`; });
+				sky.forEach(b => {
+					if (b.angle <= 0) return;
+					const p1 = polar(b.azimuth, 0), p2 = polar(b.azimuth + 5, 0), p3 = polar(b.azimuth + 5, b.angle), p4 = polar(b.azimuth, b.angle);
+					const color = b.source === 'SENSOR' ? 'var(--warn)' : 'var(--accent)';
+					s += `<polygon points="${[p1, p2, p3, p4].map(p => p.join(',')).join(' ')}" fill="${color}" fill-opacity="0.55"><title>${b.azimuth}°: ${b.angle}° (${b.source === 'SENSOR' ? '실측' : '건물 데이터'}${b.distance ? ', ' + b.distance + 'm' : ''})</title></polygon>`;
+				});
+				document.getElementById('skyline').innerHTML = s;
+				const south = sky.filter(b => b.azimuth >= 135 && b.azimuth < 225);
+				const max = Math.max(...south.map(b => b.angle));
+				document.getElementById('sky-summary').textContent = `남쪽(135°~225°) 최대 가림 각도 ${max}° — 동지 정오 해 고도(약 31°)${max >= 31 ? '보다 높아 겨울 한낮 직사광이 막힐 수 있습니다.' : '보다 낮습니다.'}`;
+			}
+			loadSky(false).catch(show);
+			document.getElementById('recalc').addEventListener('click', () => loadSky(true).catch(show));
+
 			document.getElementById('room-form').addEventListener('submit', async (ev) => {
 				ev.preventDefault();
 				const f = new FormData(ev.target);
@@ -91,7 +127,7 @@
 					await api('/api/houses/' + id, { method: 'PUT', json: {
 						name: hf.name.value, floor: Number(hf.floor.value),
 						floorHeight: hf.floorHeight.value ? Number(hf.floorHeight.value) : null } });
-					await load();
+					await load(); await loadSky(false);
 				} catch (e) { show(e); }
 			});
 
