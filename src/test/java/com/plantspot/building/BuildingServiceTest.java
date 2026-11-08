@@ -32,7 +32,7 @@ class BuildingServiceTest {
 		GpkgTestDataAccess.createGpkg(gpkg);
 		BuildingImporter.run(gpkg, db);
 		registry.add("spring.datasource.url", () -> "jdbc:sqlite:" + db.toAbsolutePath());
-		registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
+		registry.add("spring.jpa.hibernate.ddl-auto", () -> "update");
 	}
 
 	@AfterAll

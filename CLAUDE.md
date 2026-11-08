@@ -43,7 +43,7 @@
 - 웹 스타터는 `spring-boot-starter-webmvc` (`starter-web` 아님)
 - 테스트 스타터가 기능별로 나뉨: `webmvc-test`, `data-jpa-test`, `security-test`, `thymeleaf-test`
 - `@MockBean` 제거됨 → `@MockitoBean`
-- Thymeleaf 보안 확장은 `thymeleaf-extras-springsecurity7`
+- Thymeleaf 보안 확장은 `thymeleaf-extras-springsecurity6` (7은 Maven에 없음, Boot 4.1 BOM이 6을 관리)
 
 **목표 build.gradle 의존성**
 ```gradle

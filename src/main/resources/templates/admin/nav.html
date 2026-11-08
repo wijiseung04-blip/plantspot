@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+	<nav th:fragment="nav(active)" class="tabs">
+		<a th:href="@{/admin/members}" th:classappend="${active == 'members'} ? 'active'">회원</a>
+	</nav>
+</body>
+</html>

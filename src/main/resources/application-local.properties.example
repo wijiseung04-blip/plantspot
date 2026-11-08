@@ -4,3 +4,7 @@ api.kma.service-key=
 api.kma.station-id=
 api.nongsaro.api-key=
 api.vworld.key=
+
+# 처음 실행 때 관리자가 없으면 이 값으로 관리자 계정을 만든다.
+app.admin.login-id=admin
+app.admin.password=

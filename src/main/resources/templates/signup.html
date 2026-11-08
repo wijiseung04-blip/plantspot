@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('회원가입')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main class="narrow">
+		<h1>회원가입</h1>
+		<form th:action="@{/signup}" th:object="${form}" method="post" class="card">
+			<p class="flash err" th:if="${#fields.hasGlobalErrors()}" th:each="e : ${#fields.globalErrors()}" th:text="${e}"></p>
+			<label>아이디 <input type="text" th:field="*{loginId}" required></label>
+			<small class="field-err" th:if="${#fields.hasErrors('loginId')}" th:errors="*{loginId}"></small>
+			<label>비밀번호 <input type="password" th:field="*{password}" required></label>
+			<small class="field-err" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
+			<label>비밀번호 확인 <input type="password" th:field="*{passwordConfirm}" required></label>
+			<small class="field-err" th:if="${#fields.hasErrors('passwordConfirm')}" th:errors="*{passwordConfirm}"></small>
+			<small class="field-err" th:if="${#fields.hasErrors('passwordMatching')}" th:errors="*{passwordMatching}"></small>
+			<label>닉네임 <input type="text" th:field="*{nickname}" required></label>
+			<small class="field-err" th:if="${#fields.hasErrors('nickname')}" th:errors="*{nickname}"></small>
+			<button type="submit">가입</button>
+		</form>
+	</main>
+</body>
+</html>
