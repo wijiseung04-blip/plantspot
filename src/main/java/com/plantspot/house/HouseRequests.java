@@ -43,7 +43,9 @@ public final class HouseRequests {
 			@DecimalMax(value = "360", message = "방향은 0~360도입니다.") Double orientationDeg,
 			@DecimalMin(value = "180", message = "천장 높이는 180cm 이상입니다.")
 			@DecimalMax(value = "500", message = "천장 높이는 500cm 이하입니다.") Double ceilingHeight,
-			CurtainType curtain) {
+			CurtainType curtain,
+			@DecimalMin(value = "-20", message = "겨울 최저 실내 온도는 -20~35℃입니다.")
+			@DecimalMax(value = "35", message = "겨울 최저 실내 온도는 -20~35℃입니다.") Double winterMinTemp) {
 	}
 
 	public record SaveWindow(

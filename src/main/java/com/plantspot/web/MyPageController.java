@@ -36,6 +36,18 @@ public class MyPageController {
 		return "my/sunlight";
 	}
 
+	@GetMapping("/my/rooms/{id}/recommendations")
+	public String recommendations(@PathVariable Long id, Model model) {
+		model.addAttribute("roomId", id);
+		model.addAttribute("seasons", com.plantspot.sunlight.SeasonDay.values());
+		return "my/recommendations";
+	}
+
+	@GetMapping("/my/plants")
+	public String myPlants() {
+		return "my/plants";
+	}
+
 	@GetMapping("/my/rooms/{id}")
 	public String room(@PathVariable Long id, Model model) {
 		model.addAttribute("roomId", id);

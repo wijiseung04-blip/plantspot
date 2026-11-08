@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('간단 예측')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<h1>회원가입 없이 간단 예측</h1>
+		<p class="muted">우리 건물(동·지번), 층, 창 방향만 알려주세요. 주변 건물 높이로 가림을 계산해
+			표준 방(4m × 3.5m, 창 180 × 150cm)에 계절별로 햇빛이 얼마나 드는지 보여드립니다.</p>
+		<p id="msg" class="flash err" hidden></p>
+		<form id="form" class="card form">
+			<div class="row">
+				<label>동 <select name="dong" id="dong" required></select></label>
+				<label>지번 <input name="jibun" placeholder="예: 1160-6" required></label>
+				<label>층 <input name="floor" type="number" min="1" max="80" value="3" required></label>
+				<label>창 방향
+					<select name="windowAzimuth">
+						<option value="180">남</option><option value="135">남동</option><option value="225">남서</option>
+						<option value="90">동</option><option value="270">서</option>
+						<option value="45">북동</option><option value="315">북서</option><option value="0">북</option>
+					</select>
+				</label>
+			</div>
+			<button type="submit">예측하기</button>
+		</form>
+
+		<section id="result" hidden>
+			<h2 id="headline"></h2>
+			<div class="row">
+				<div class="card" style="max-width:340px"><svg id="skyline" viewBox="-120 -120 240 240" style="width:100%"></svg>
+					<p class="muted" style="margin:0">창밖 스카이라인 (색칠 = 건물에 가린 하늘, 화살표 = 창 방향)</p></div>
+				<div class="table-wrap" style="flex:2 1 400px">
+					<table>
+						<thead><tr><th>계절</th><th>창에 해 드는 시간</th><th>창가 (0~1m)</th><th>방 가운데 (1~2.5m)</th><th>안쪽 (2.5m~)</th></tr></thead>
+						<tbody id="seasons"></tbody>
+					</table>
+				</div>
+			</div>
+			<h2>어울리는 식물</h2>
+			<div id="plants" class="grid"></div>
+			<div class="card" sec:authorize="!isAuthenticated()">
+				<strong>우리 방 모양과 창문을 그대로 넣고, 창가 센서로 실제 햇빛에 맞추려면</strong>
+				<a class="button" th:href="@{/signup}" style="margin-left:8px">회원가입</a>
+			</div>
+		</section>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', async () => {
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			const hm = (m) => m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m}분`;
+			const LV = { BRIGHT: '밝음', MEDIUM: '보통', DIM: '어두움' };
+			try {
+				const dongs = await api('/api/buildings/dongs');
+				document.getElementById('dong').innerHTML = dongs.map(d => `<option ${d === '하단동' ? 'selected' : ''}>${escapeHtml(d)}</option>`).join('');
+			} catch (e) { show(e); }
+
+			function polar(az, alt) { const r = 100 * (90 - alt) / 90, t = az * Math.PI / 180; return [r * Math.sin(t), -r * Math.cos(t)]; }
+			function drawSky(sky, windowAz) {
+				let s = '';
+				[0, 30, 60].forEach(a => s += `<circle r="${100 * (90 - a) / 90}" fill="none" stroke="var(--line)"/>`);
+				['북', '동', '남', '서'].forEach((n, i) => { const [x, y] = polar(i * 90, -12); s += `<text x="${x}" y="${y + 4}" font-size="11" text-anchor="middle" fill="var(--muted)">${n}</text>`; });
+				sky.forEach((a, i) => {
+					if (a <= 0) return;
+					const pts = [polar(i * 5, 0), polar(i * 5 + 5, 0), polar(i * 5 + 5, a), polar(i * 5, a)];
+					s += `<polygon points="${pts.map(p => p.join(',')).join(' ')}" fill="var(--accent)" fill-opacity="0.55"/>`;
+				});
+				const [x, y] = polar(windowAz, 20);
+				s += `<line x1="0" y1="0" x2="${x}" y2="${y}" stroke="var(--sun)" stroke-width="4" marker-end="url(#arrow)"/>`;
+				document.getElementById('skyline').innerHTML = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--sun)"/></marker></defs>` + s;
+			}
+			const zone = (z) => `<span class="badge${z.level === 'DIM' ? ' warn' : ''}">${LV[z.level]}</span> 직사광 ${hm(z.directMinutes)} · 약 ${Math.round(z.lux).toLocaleString()} lux`;
+
+			document.getElementById('form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const f = new FormData(ev.target);
+				try {
+					const r = await api('/api/preview', { method: 'POST', json: {
+						dong: f.get('dong'), jibun: f.get('jibun').trim(), floor: Number(f.get('floor')), windowAzimuth: Number(f.get('windowAzimuth')) } });
+					msg.hidden = true;
+					document.getElementById('result').hidden = false;
+					document.getElementById('headline').textContent =
+						`${r.dong} ${r.jibun} (건물 높이 ${r.buildingHeight}m) ${r.floor}층 ${r.direction} 창 — 창 앞 평균 가림 각도 ${r.frontObstructionDeg}°`;
+					drawSky(r.skyline, r.windowAzimuth);
+					document.getElementById('seasons').innerHTML = r.seasons.map(s => `<tr><td>${s.label}</td><td>${hm(s.windowSunMinutes)}</td>
+						<td>${zone(s.nearWindow)}</td><td>${zone(s.middle)}</td><td>${zone(s.deep)}</td></tr>`).join('');
+					document.getElementById('plants').innerHTML = r.plants.length ? r.plants.map(p => `
+						<a class="card" href="/plants/${p.id}" style="text-decoration:none;color:inherit;display:flex;gap:12px">
+							${p.thumbnailUrl ? `<img src="${escapeHtml(p.thumbnailUrl)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px">` : ''}
+							<div><strong>${escapeHtml(p.name)}</strong> <span class="badge">${Math.round(p.score)}점</span>
+							<div class="muted">${p.type === 'FIXED' ? `1년 내내 창에서 약 ${p.distanceFromWindow}cm` : '계절마다 자리 옮기기'}</div></div>
+						</a>`).join('') : `<p class="muted">식물 정보가 아직 없습니다 (${r.plantCount}종).</p>`;
+				} catch (e) { show(e); }
+			});
+		});
+	</script>
+</body>
+</html>

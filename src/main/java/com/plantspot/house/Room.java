@@ -53,6 +53,10 @@ public class Room {
 	@Column(nullable = false, length = 20)
 	private CurtainType curtain;
 
+	/** 겨울 최저 실내 온도(℃): 사용자가 입력하거나 온습도 센서로 측정. 식물 겨울 최저온도와 비교해 경고 */
+	@Column(name = "winter_min_temp")
+	private Double winterMinTemp;
+
 	/** 평면도 이미지(업로드 파일) 번호, 없으면 null */
 	@Column(name = "floor_plan_file_id")
 	private Long floorPlanFileId;
@@ -77,6 +81,14 @@ public class Room {
 		this.orientationDeg = Shape.normalize(orientationDeg);
 		this.ceilingHeight = ceilingHeight;
 		this.curtain = curtain;
+	}
+
+	public void changeWinterMinTemp(Double celsius) {
+		this.winterMinTemp = celsius;
+	}
+
+	public Double getWinterMinTemp() {
+		return winterMinTemp;
 	}
 
 	public void attachFloorPlan(Long fileId) {

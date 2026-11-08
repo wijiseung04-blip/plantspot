@@ -53,6 +53,7 @@
 				<label>방 이름 <input name="name" required maxlength="40"></label>
 				<label>평면도 위쪽 방향(도) <input name="orientationDeg" type="number" min="0" max="360" step="1" required></label>
 				<label>천장 높이(cm) <input name="ceilingHeight" type="number" min="180" max="500"></label>
+				<label>겨울 최저 실내 온도(℃) <input name="winterMinTemp" type="number" min="-20" max="35" step="0.5" placeholder="모르면 비움"></label>
 				<label>커튼
 					<select name="curtain">
 						<option th:each="c : ${curtains}" th:value="${c}" th:text="${c.label}"></option>
@@ -118,6 +119,7 @@
 					<a href="/my/rooms/${id}/recommendations">식물 추천</a>`;
 				rf.name.value = room.name; rf.orientationDeg.value = room.orientationDeg;
 				rf.ceilingHeight.value = room.ceilingHeight; rf.curtain.value = room.curtain;
+				rf.winterMinTemp.value = room.winterMinTemp ?? '';
 				document.getElementById('wall').innerHTML = room.shape.map((p, i) => {
 					const az = wallAzimuth(room.shape, i, room.orientationDeg);
 					const len = Math.round(Math.hypot(room.shape[(i + 1) % room.shape.length].x - p.x, room.shape[(i + 1) % room.shape.length].y - p.y));
@@ -165,7 +167,8 @@
 				try {
 					await api('/api/rooms/' + id, { method: 'PUT', json: {
 						name: rf.name.value, shape: room.shape, orientationDeg: Number(rf.orientationDeg.value),
-						ceilingHeight: rf.ceilingHeight.value ? Number(rf.ceilingHeight.value) : null, curtain: rf.curtain.value } });
+						ceilingHeight: rf.ceilingHeight.value ? Number(rf.ceilingHeight.value) : null, curtain: rf.curtain.value,
+						winterMinTemp: rf.winterMinTemp.value ? Number(rf.winterMinTemp.value) : null } });
 					msg.hidden = true;
 					await load();
 				} catch (e) { show(e); }
