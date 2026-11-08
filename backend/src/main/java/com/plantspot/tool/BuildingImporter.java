@@ -31,7 +31,7 @@ import com.plantspot.geo.TmConverter.LatLon;
 
 /**
  * [① DB 데이터 생성 프로그램] 국토부 GIS 건물통합정보(QGIS에서 사하구만 저장한 GeoPackage)를 읽어
- * building 테이블(MySQL)로 변환한다.
+ * building 테이블(SQLite data/plantspot.db)로 변환한다.
  *
  * <pre>
  * ./gradlew :backend:importBuildings -Pgpkg=C:/data/saha.gpkg

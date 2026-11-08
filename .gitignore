@@ -39,5 +39,6 @@ out/
 ### plantspot ###
 **/src/main/resources/application-local.properties
 backend/data/uploads/
-*.db
+backend/data/*.db
+backend/data/*.db-*
 

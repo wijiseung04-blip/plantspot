@@ -22,6 +22,7 @@ public class Building {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(columnDefinition = "integer") // SQLite 자동 번호(rowid)가 되려면 타입이 정확히 integer여야 함
 	private Long id;
 
 	/** A2 고유번호(PNU) */
@@ -37,7 +38,7 @@ public class Building {
 	/** A5 지번 (예: 1160-6) */
 	private String jibun;
 
-	/** A9 용도 (MySQL 예약어 USAGE를 피해 칸 이름 building_usage) */
+	/** A9 용도 (칸 이름 building_usage — USAGE는 SQL 예약어인 DB가 있어 피함) */
 	@Column(name = "building_usage")
 	private String usage;
 

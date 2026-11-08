@@ -16,13 +16,12 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
-	runtimeOnly 'com.mysql:mysql-connector-j'                 // DB: MySQL
-	implementation 'org.xerial:sqlite-jdbc'                   // GeoPackage(.gpkg = SQLite 파일) 읽기 전용
+	implementation 'org.xerial:sqlite-jdbc'                   // DB: SQLite 파일(data/plantspot.db), GeoPackage 읽기
+	implementation 'org.hibernate.orm:hibernate-community-dialects'   // SQLiteDialect
 	implementation 'org.apache.pdfbox:pdfbox:3.0.8'           // 리포트 PDF
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-	testRuntimeOnly 'com.h2database:h2'                       // 테스트는 MySQL 호환 모드 메모리 DB
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

@@ -1,9 +1,5 @@
 # 이 파일을 같은 폴더에 application-local.properties 로 복사한 뒤 값을 채운다. (커밋 금지)
 
-# ===== MySQL =====
-spring.datasource.username=plantspot
-spring.datasource.password=여기에_DB_비밀번호
-
 # ===== 공공데이터포털 (일반 인증키 Decoding 값) =====
 api.kasi.service-key=
 api.kma.service-key=
