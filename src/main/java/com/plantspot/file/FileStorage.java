@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.PathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +36,7 @@ public class FileStorage {
 		if (!Files.isRegularFile(path)) {
 			throw new com.plantspot.common.NotFoundException("파일 내용이 없습니다.");
 		}
-		return new PathResource(path);
+		return new FileSystemResource(path);
 	}
 
 	public void delete(String storedName) {

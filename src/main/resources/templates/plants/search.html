@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('식물 검색')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<h1>식물 검색</h1>
+		<p class="muted">농촌진흥청 농사로 실내정원용 식물 정보입니다.</p>
+		<form id="search" class="card form">
+			<div class="row">
+				<label>이름 <input name="keyword" placeholder="예: 스킨답서스"></label>
+				<label>빛 요구
+					<select name="light">
+						<option value="">전체</option>
+						<option th:each="e : ${lights}" th:value="${e.key}" th:text="${e.value}"></option>
+					</select>
+				</label>
+				<label>관리 수준
+					<select name="level">
+						<option value="">전체</option>
+						<option value="089001">초보자</option>
+						<option value="089002">경험자</option>
+						<option value="089003">전문가</option>
+					</select>
+				</label>
+			</div>
+			<button type="submit">검색</button>
+		</form>
+		<p id="count" class="muted"></p>
+		<div id="list" class="grid"></div>
+		<p><button type="button" id="more" class="secondary" hidden>더 보기</button></p>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', () => {
+			const form = document.getElementById('search');
+			let page = 0, query = '';
+			async function load(reset) {
+				if (reset) { page = 0; document.getElementById('list').innerHTML = ''; }
+				const r = await api(`/api/plants?${query}&page=${page}&size=24`);
+				document.getElementById('count').textContent = `${r.total}종`;
+				document.getElementById('list').insertAdjacentHTML('beforeend', r.items.map(p => `
+					<a class="card" href="/plants/${p.id}" style="text-decoration:none;color:inherit;display:flex;gap:12px">
+						${p.thumbnailUrl ? `<img src="${escapeHtml(p.thumbnailUrl)}" alt="" loading="lazy" style="width:72px;height:72px;object-fit:cover;border-radius:8px">` : ''}
+						<div><strong>${escapeHtml(p.name)}</strong>
+							<div class="muted">${escapeHtml(p.lightNames || '')}</div>
+							<div class="muted">${p.minLux.toLocaleString()}~${p.maxLux.toLocaleString()} lux${p.winterMinTemp != null ? ' · 겨울 ' + p.winterMinTemp + '℃ 이상' : ''}</div>
+						</div>
+					</a>`).join('') || (reset ? '<p class="muted">식물 정보가 없습니다. 관리자가 농사로 데이터를 가져오면 보입니다.</p>' : ''));
+				document.getElementById('more').hidden = (page + 1) * r.size >= r.total;
+			}
+			form.addEventListener('submit', (ev) => {
+				ev.preventDefault();
+				query = new URLSearchParams(new FormData(form)).toString();
+				load(true).catch(e => alert(e.message));
+			});
+			document.getElementById('more').addEventListener('click', () => { page++; load(false).catch(e => alert(e.message)); });
+			load(true).catch(e => alert(e.message));
+		});
+	</script>
+</body>
+</html>

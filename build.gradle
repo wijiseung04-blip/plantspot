@@ -55,3 +55,15 @@ tasks.register('importBuildings', JavaExec) {
 	jvmArgs '--enable-native-access=ALL-UNNAMED'
 	args = [findProperty('gpkg') ?: '', findProperty('db') ?: 'data/plantspot.db']
 }
+
+// [① DB 데이터 생성 프로그램] 농사로 실내정원용 식물 → plant_species (키: application-local.properties)
+// 사용: ./gradlew importPlants
+tasks.register('importPlants', JavaExec) {
+	group = 'plantspot'
+	description = '농사로 실내정원용 식물 목록·상세를 모두 받아 plant_species 테이블에 저장한다.'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.plantspot.PlantSpotApplication'
+	workingDir = projectDir
+	jvmArgs '--enable-native-access=ALL-UNNAMED'
+	args = ['--plantspot.import=plants', '--spring.main.web-application-type=none']
+}
