@@ -4,12 +4,11 @@ plugins {
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
-group = 'com.plantspot'
+group = 'com.springboot'
 version = '0.0.1-SNAPSHOT'
 
-// 프로젝트 하나 안에서 나눈다:
-//   src/main/java/com/plantspot/backend  — REST API·계산·DB·보안 (Controller → Service → Repository → SQLite)
-//   src/main/java/com/plantspot/frontend — 화면 컨트롤러, src/main/resources/templates·static — 화면 파일
+// 교과서 3계층 구조: com.springboot.controller → service → repository → domain(엔티티) → SQLite(data/plantspot.db)
+// 화면 파일: src/main/resources/templates·static
 
 repositories {
 	mavenCentral()
@@ -55,7 +54,7 @@ def runner = { String name, String desc, List<String> extra ->
 		group = 'plantspot'
 		description = desc
 		classpath = sourceSets.main.runtimeClasspath
-		mainClass = 'com.plantspot.PlantSpotApplication'
+		mainClass = 'com.springboot.PlantSpotApplication'
 		workingDir = projectDir
 		jvmArgs '--enable-native-access=ALL-UNNAMED'
 		args = ['--spring.main.web-application-type=none'] + extra
