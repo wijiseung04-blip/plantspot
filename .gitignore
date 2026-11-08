@@ -35,3 +35,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### plantspot ###
+/data/*.db
+/data/*.db-*
+src/main/resources/application-local.properties

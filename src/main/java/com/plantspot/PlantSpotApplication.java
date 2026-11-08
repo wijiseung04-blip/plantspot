@@ -1,13 +1,12 @@
-package com.springboot;
+package com.plantspot;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class PlantspotApplication {
+public class PlantSpotApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(PlantspotApplication.class, args);
+		SpringApplication.run(PlantSpotApplication.class, args);
 	}
-
 }
