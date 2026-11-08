@@ -44,8 +44,19 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.BAD_REQUEST, message, req);
 	}
 
-	@ExceptionHandler({ MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class,
-			IllegalArgumentException.class })
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException e,
+			HttpServletRequest req) {
+		return build(HttpStatus.BAD_REQUEST, "필수 값 '" + e.getParameterName() + "'이(가) 없습니다.", req);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e,
+			HttpServletRequest req) {
+		return build(HttpStatus.BAD_REQUEST, "'" + e.getName() + "' 값의 형식이 잘못되었습니다: " + e.getValue(), req);
+	}
+
+	@ExceptionHandler(IllegalArgumentException.class)
 	public ResponseEntity<ErrorResponse> handleBadRequest(Exception e, HttpServletRequest req) {
 		return build(HttpStatus.BAD_REQUEST, e.getMessage(), req);
 	}
