@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('우리 집')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<h1>우리 집</h1>
+		<p id="msg" class="flash err" hidden></p>
+		<div id="houses" class="grid"></div>
+
+		<h2>집 등록</h2>
+		<form id="house-form" class="card form">
+			<p class="muted">동을 고르고 지번을 입력하면 건물 데이터(사하구 41,271동)에서 우리 건물을 찾습니다.</p>
+			<div class="row">
+				<label>동 <select name="dong" id="dong" required></select></label>
+				<label>지번 <input name="jibun" placeholder="예: 1160-6" required></label>
+			</div>
+			<div class="row">
+				<label>집 이름 <input name="name" placeholder="예: 우리 집" required maxlength="40"></label>
+				<label>층 <input name="floor" type="number" min="1" max="80" value="1" required></label>
+				<label>층 높이(m) <input name="floorHeight" type="number" min="2.2" max="6" step="0.1" value="3.0"></label>
+			</div>
+			<button type="submit">등록</button>
+		</form>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', async () => {
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+
+			try {
+				const dongs = await api('/api/buildings/dongs');
+				document.getElementById('dong').innerHTML = dongs.length
+					? dongs.map(d => `<option>${escapeHtml(d)}</option>`).join('')
+					: '<option value="">건물 데이터 없음 (관리자가 가져오기 필요)</option>';
+			} catch (e) { show(e); }
+
+			async function load() {
+				const houses = await api('/api/houses');
+				document.getElementById('houses').innerHTML = houses.length ? houses.map(h => `
+					<a class="card" href="/my/houses/${h.id}" style="text-decoration:none;color:inherit">
+						<strong>${escapeHtml(h.name)}</strong>
+						<div class="muted">${escapeHtml(h.dong)} ${escapeHtml(h.jibun)} · ${h.floor}층</div>
+						<div class="muted">건물 높이 ${h.buildingHeight ?? '-'}m · 방 ${h.roomCount}개</div>
+					</a>`).join('') : '<p class="muted">등록한 집이 없습니다.</p>';
+			}
+			load().catch(show);
+
+			document.getElementById('house-form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const f = new FormData(ev.target);
+				try {
+					const h = await api('/api/houses', { method: 'POST', json: {
+						dong: f.get('dong'), jibun: f.get('jibun').trim(), name: f.get('name'),
+						floor: Number(f.get('floor')), floorHeight: f.get('floorHeight') ? Number(f.get('floorHeight')) : null } });
+					location.href = '/my/houses/' + h.id;
+				} catch (e) { show(e); }
+			});
+		});
+	</script>
+</body>
+</html>

@@ -17,6 +17,7 @@ public class Member {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(columnDefinition = "integer") // SQLite 자동 번호(rowid)가 되려면 타입이 정확히 integer여야 함
 	private Long id;
 
 	@Column(name = "login_id", nullable = false, unique = true, length = 20)

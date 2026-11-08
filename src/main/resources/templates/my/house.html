@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('집')}"></head>
+<body th:data-house-id="${houseId}">
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<p><a href="/my/houses">← 우리 집 목록</a></p>
+		<h1 id="title">집</h1>
+		<p id="info" class="muted"></p>
+		<p id="msg" class="flash err" hidden></p>
+
+		<h2>방</h2>
+		<div id="rooms" class="grid"></div>
+
+		<h2>방 추가</h2>
+		<form id="room-form" class="card form">
+			<p class="muted">직사각형 방으로 먼저 만들고, 자세한 모양은 평면도 에디터에서 고칠 수 있습니다.</p>
+			<div class="row">
+				<label>방 이름 <input name="name" required maxlength="40" placeholder="예: 거실"></label>
+				<label>가로(cm) <input name="w" type="number" min="100" max="3000" value="400" required></label>
+				<label>세로(cm) <input name="d" type="number" min="100" max="3000" value="350" required></label>
+			</div>
+			<div class="row">
+				<label>평면도 위쪽이 가리키는 방향
+					<select name="orientationDeg">
+						<option value="0">북</option><option value="45">북동</option><option value="90">동</option>
+						<option value="135">남동</option><option value="180">남</option><option value="225">남서</option>
+						<option value="270">서</option><option value="315">북서</option>
+					</select>
+				</label>
+				<label>천장 높이(cm) <input name="ceilingHeight" type="number" min="180" max="500" value="230"></label>
+				<label>커튼
+					<select name="curtain">
+						<option th:each="c : ${curtains}" th:value="${c}" th:text="${c.label}"></option>
+					</select>
+				</label>
+			</div>
+			<button type="submit">방 추가</button>
+		</form>
+
+		<h2>집 정보 수정</h2>
+		<form id="house-form" class="card form">
+			<div class="row">
+				<label>집 이름 <input name="name" required maxlength="40"></label>
+				<label>층 <input name="floor" type="number" min="1" max="80" required></label>
+				<label>층 높이(m) <input name="floorHeight" type="number" min="2.2" max="6" step="0.1"></label>
+			</div>
+			<button type="submit">저장</button>
+			<button type="button" id="delete-house" class="danger">집 삭제</button>
+		</form>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', async () => {
+			const id = document.body.dataset.houseId;
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			const hf = document.getElementById('house-form');
+
+			async function load() {
+				const h = await api('/api/houses/' + id);
+				document.getElementById('title').textContent = h.name;
+				document.getElementById('info').textContent =
+					`${h.dong} ${h.jibun} · ${h.floor}층 · 건물 높이 ${h.buildingHeight ?? '-'}m (${h.buildingHeightSource ?? '-'}) · 위도 ${h.latitude.toFixed(5)}, 경도 ${h.longitude.toFixed(5)}`;
+				hf.name.value = h.name; hf.floor.value = h.floor; hf.floorHeight.value = h.floorHeight;
+				const rooms = await api(`/api/houses/${id}/rooms`);
+				document.getElementById('rooms').innerHTML = rooms.length ? rooms.map(r => `
+					<a class="card" href="/my/rooms/${r.id}" style="text-decoration:none;color:inherit">
+						<strong>${escapeHtml(r.name)}</strong>
+						<div class="muted">${r.areaM2}㎡ · 창문 ${r.windows.length}개 · ${escapeHtml(r.curtainLabel)}</div>
+						<div class="muted">${r.windows.map(w => escapeHtml(w.direction)).join(', ')}</div>
+					</a>`).join('') : '<p class="muted">방이 없습니다.</p>';
+			}
+			load().catch(show);
+
+			document.getElementById('room-form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const f = new FormData(ev.target);
+				const w = Number(f.get('w')), d = Number(f.get('d'));
+				try {
+					const r = await api(`/api/houses/${id}/rooms`, { method: 'POST', json: {
+						name: f.get('name'), shape: [{x:0,y:0},{x:w,y:0},{x:w,y:d},{x:0,y:d}],
+						orientationDeg: Number(f.get('orientationDeg')),
+						ceilingHeight: Number(f.get('ceilingHeight')), curtain: f.get('curtain') } });
+					location.href = '/my/rooms/' + r.id;
+				} catch (e) { show(e); }
+			});
+
+			hf.addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				try {
+					await api('/api/houses/' + id, { method: 'PUT', json: {
+						name: hf.name.value, floor: Number(hf.floor.value),
+						floorHeight: hf.floorHeight.value ? Number(hf.floorHeight.value) : null } });
+					await load();
+				} catch (e) { show(e); }
+			});
+
+			document.getElementById('delete-house').addEventListener('click', async () => {
+				if (!confirm('집과 모든 방·창문을 삭제할까요?')) return;
+				try { await api('/api/houses/' + id, { method: 'DELETE' }); location.href = '/my/houses'; }
+				catch (e) { show(e); }
+			});
+		});
+	</script>
+</body>
+</html>
