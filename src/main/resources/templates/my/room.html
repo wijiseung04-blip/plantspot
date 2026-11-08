@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('방')}"></head>
+<body th:data-room-id="${roomId}">
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<p><a id="back" href="/my/houses">← 집으로</a></p>
+		<h1 id="title">방</h1>
+		<p id="info" class="muted"></p>
+		<p id="msg" class="flash err" hidden></p>
+		<nav class="tabs" id="room-links"></nav>
+
+		<div class="row">
+			<div class="card"><svg id="plan" viewBox="0 0 100 100" style="width:100%;max-height:360px"></svg></div>
+			<div>
+				<h2 style="margin-top:0">창문</h2>
+				<div class="table-wrap">
+					<table>
+						<thead><tr><th>벽</th><th>방향</th><th>폭×높이</th><th>창턱</th><th></th></tr></thead>
+						<tbody id="windows"></tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+
+		<h2>창문 추가</h2>
+		<form id="window-form" class="card form">
+			<div class="row">
+				<label>벽 <select name="wallIndex" id="wall"></select></label>
+				<label>벽 시작점에서 거리(cm) <input name="offset" type="number" min="0" value="50" required></label>
+			</div>
+			<div class="row">
+				<label>폭(cm) <input name="width" type="number" min="20" max="1500" value="180" required></label>
+				<label>높이(cm) <input name="height" type="number" min="20" max="450" value="150" required></label>
+				<label>창턱 높이(cm) <input name="sillHeight" type="number" min="0" max="300" value="60" required></label>
+			</div>
+			<button type="submit">창문 추가</button>
+		</form>
+
+		<h2>방 정보 수정</h2>
+		<form id="room-form" class="card form">
+			<div class="row">
+				<label>방 이름 <input name="name" required maxlength="40"></label>
+				<label>평면도 위쪽 방향(도) <input name="orientationDeg" type="number" min="0" max="360" step="1" required></label>
+				<label>천장 높이(cm) <input name="ceilingHeight" type="number" min="180" max="500"></label>
+				<label>커튼
+					<select name="curtain">
+						<option th:each="c : ${curtains}" th:value="${c}" th:text="${c.label}"></option>
+					</select>
+				</label>
+			</div>
+			<button type="submit">저장</button>
+			<button type="button" id="delete-room" class="danger">방 삭제</button>
+		</form>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', () => {
+			const id = document.body.dataset.roomId;
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			const rf = document.getElementById('room-form');
+			let room = null;
+
+			const DIRS = ['북', '북동', '동', '남동', '남', '남서', '서', '북서'];
+			function wallAzimuth(pts, i, orient) {
+				const a = pts[i], b = pts[(i + 1) % pts.length];
+				let area = 0;
+				pts.forEach((p, k) => { const q = pts[(k + 1) % pts.length]; area += p.x * q.y - q.x * p.y; });
+				const dx = b.x - a.x, dy = b.y - a.y;
+				const nx = area > 0 ? dy : -dy, ny = area > 0 ? -dx : dx;
+				return ((orient + Math.atan2(nx, -ny) * 180 / Math.PI) % 360 + 360) % 360;
+			}
+
+			function draw(r) {
+				const pts = r.shape;
+				const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+				const minX = Math.min(...xs), minY = Math.min(...ys);
+				const w = Math.max(...xs) - minX, h = Math.max(...ys) - minY, pad = Math.max(w, h) * 0.12;
+				const svg = document.getElementById('plan');
+				svg.setAttribute('viewBox', `${minX - pad} ${minY - pad} ${w + pad * 2} ${h + pad * 2}`);
+				const sw = Math.max(w, h) / 120;
+				let s = `<polygon points="${pts.map(p => p.x + ',' + p.y).join(' ')}" fill="var(--accent-soft)" stroke="var(--text)" stroke-width="${sw}"/>`;
+				pts.forEach((p, i) => {
+					const q = pts[(i + 1) % pts.length];
+					s += `<text x="${(p.x + q.x) / 2}" y="${(p.y + q.y) / 2}" font-size="${sw * 9}" fill="var(--muted)" text-anchor="middle">${i}</text>`;
+				});
+				r.windows.forEach(win => {
+					const a = pts[win.wallIndex], b = pts[(win.wallIndex + 1) % pts.length];
+					const L = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+					const x1 = a.x + ux * win.offset, y1 = a.y + uy * win.offset;
+					const x2 = x1 + ux * win.width, y2 = y1 + uy * win.width;
+					s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--sun)" stroke-width="${sw * 4}"/>`;
+				});
+				const cx = minX - pad / 2, cy = minY - pad / 2;
+				s += `<text x="${cx}" y="${cy}" font-size="${sw * 10}" fill="var(--accent)" text-anchor="middle" transform="rotate(${-r.orientationDeg} ${cx} ${cy})">N↑</text>`;
+				svg.innerHTML = s;
+			}
+
+			async function load() {
+				room = await api('/api/rooms/' + id);
+				document.getElementById('title').textContent = room.name;
+				document.getElementById('back').href = '/my/houses/' + room.houseId;
+				document.getElementById('info').textContent =
+					`${room.areaM2}㎡ · 천장 ${room.ceilingHeight}cm · ${room.curtainLabel} · 평면도 위쪽 ${room.orientationDeg}°`;
+				document.getElementById('room-links').innerHTML = `
+					<a href="/my/rooms/${id}/sunlight">계절별 햇빛</a>
+					<a href="/editor?roomId=${id}">평면도 햇빛 에디터</a>
+					<a href="/my/rooms/${id}/recommendations">식물 추천</a>`;
+				rf.name.value = room.name; rf.orientationDeg.value = room.orientationDeg;
+				rf.ceilingHeight.value = room.ceilingHeight; rf.curtain.value = room.curtain;
+				document.getElementById('wall').innerHTML = room.shape.map((p, i) => {
+					const az = wallAzimuth(room.shape, i, room.orientationDeg);
+					const len = Math.round(Math.hypot(room.shape[(i + 1) % room.shape.length].x - p.x, room.shape[(i + 1) % room.shape.length].y - p.y));
+					return `<option value="${i}">${i}번 벽 · ${DIRS[Math.round(az / 45) % 8]}향 · ${len}cm</option>`;
+				}).join('');
+				document.getElementById('windows').innerHTML = room.windows.length ? room.windows.map(w => `
+					<tr><td>${w.wallIndex}</td><td>${escapeHtml(w.direction)} (${w.azimuthDeg}°)</td>
+						<td>${w.width}×${w.height}cm</td><td>${w.sillHeight}cm</td>
+						<td><button class="small danger" data-del="${w.id}">삭제</button></td></tr>`).join('')
+					: '<tr><td colspan="5" class="muted">창문이 없습니다.</td></tr>';
+				draw(room);
+			}
+			load().catch(show);
+
+			document.getElementById('windows').addEventListener('click', async (ev) => {
+				const del = ev.target.dataset.del;
+				if (!del) return;
+				try { await api('/api/windows/' + del, { method: 'DELETE' }); await load(); } catch (e) { show(e); }
+			});
+
+			document.getElementById('window-form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const f = new FormData(ev.target);
+				try {
+					await api(`/api/rooms/${id}/windows`, { method: 'POST', json: Object.fromEntries(
+						['wallIndex', 'offset', 'width', 'height', 'sillHeight'].map(k => [k, Number(f.get(k))])) });
+					msg.hidden = true;
+					await load();
+				} catch (e) { show(e); }
+			});
+
+			rf.addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				try {
+					await api('/api/rooms/' + id, { method: 'PUT', json: {
+						name: rf.name.value, shape: room.shape, orientationDeg: Number(rf.orientationDeg.value),
+						ceilingHeight: rf.ceilingHeight.value ? Number(rf.ceilingHeight.value) : null, curtain: rf.curtain.value } });
+					msg.hidden = true;
+					await load();
+				} catch (e) { show(e); }
+			});
+
+			document.getElementById('delete-room').addEventListener('click', async () => {
+				if (!confirm('방과 창문을 삭제할까요?')) return;
+				try { await api('/api/rooms/' + id, { method: 'DELETE' }); location.href = '/my/houses/' + room.houseId; }
+				catch (e) { show(e); }
+			});
+		});
+	</script>
+</body>
+</html>
