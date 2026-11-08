@@ -109,6 +109,7 @@ public class HouseService {
 		validateShape(req.shape());
 		Room room = new Room(house, req.name().trim(), req.shape(), req.orientationDeg(), ceiling(req),
 				req.curtain() != null ? req.curtain() : CurtainType.NONE);
+		room.changeWinterMinTemp(req.winterMinTemp());
 		house.getRooms().add(room);
 		return RoomResponse.of(rooms.save(room));
 	}
@@ -133,6 +134,9 @@ public class HouseService {
 		validateShape(req.shape());
 		room.update(req.name().trim(), req.shape(), req.orientationDeg(), ceiling(req),
 				req.curtain() != null ? req.curtain() : room.getCurtain());
+		if (req.winterMinTemp() != null) {
+			room.changeWinterMinTemp(req.winterMinTemp());
+		}
 		// 모양이 바뀌어도 기존 창문이 벽 안에 들어가는지 다시 확인하고 방향을 다시 계산
 		for (RoomWindow w : room.getWindows()) {
 			validateWindow(room, w.getWallIndex(), w.getOffset(), w.getWidth(), w.getHeight(), w.getSillHeight());

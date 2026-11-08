@@ -30,6 +30,12 @@ public class PlantPageController {
 		return "plants/detail";
 	}
 
+	/** 비회원 간단 예측 */
+	@GetMapping("/try")
+	public String tryPreview() {
+		return "try";
+	}
+
 	@GetMapping("/admin/plants")
 	public String admin(Model model) {
 		model.addAttribute("count", service.count());

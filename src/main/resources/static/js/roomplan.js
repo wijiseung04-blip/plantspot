@@ -28,10 +28,11 @@
 		let s = `<polygon points="${pts.map(p => p.x + ',' + p.y).join(' ')}" fill="var(--surface)" stroke="none"/>`;
 		cells.forEach((c, i) => {
 			let fill;
-			if (opt.mode === 'level') fill = LEVEL_COLOR[c.level];
+			if (opt.fill) fill = opt.fill(c);
+			else if (opt.mode === 'level') fill = LEVEL_COLOR[c.level];
 			else if (opt.mode === 'lux') fill = luxColor(c.lux);
 			else fill = sunColor(c.directMinutes, maxDirect);
-			const tip = `직사광 ${Math.floor(c.directMinutes / 60)}시간 ${c.directMinutes % 60}분 · 하늘빛 약 ${Math.round(c.lux)} lux · 창에서 ${Math.round(c.distance)}cm`;
+			const tip = opt.tip ? opt.tip(c) : `직사광 ${Math.floor(c.directMinutes / 60)}시간 ${c.directMinutes % 60}분 · 하늘빛 약 ${Math.round(c.lux)} lux · 창에서 ${Math.round(c.distance)}cm`;
 			s += `<rect data-i="${i}" x="${c.x - cs / 2}" y="${c.y - cs / 2}" width="${cs}" height="${cs}" fill="${fill}" stroke="var(--line)" stroke-width="${sw / 4}"><title>${tip}</title></rect>`;
 		});
 		s += `<polygon points="${pts.map(p => p.x + ',' + p.y).join(' ')}" fill="none" stroke="var(--text)" stroke-width="${sw * 1.5}"/>`;
@@ -53,6 +54,13 @@
 		}
 	}
 
+	/** 점수(0~100) → 빨강~노랑~초록 */
+	function scoreColor(score) {
+		const h = Math.max(0, Math.min(120, score * 1.2));
+		return `hsla(${h}, 70%, 48%, 0.75)`;
+	}
+
 	window.drawRoomPlan = drawRoomPlan;
+	window.scoreColor = scoreColor;
 	window.LEVEL_COLOR = LEVEL_COLOR;
 })();

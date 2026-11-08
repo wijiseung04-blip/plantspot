@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('내 식물')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<script th:src="@{/js/roomplan.js}" defer></script>
+	<main>
+		<h1>내 식물</h1>
+		<p id="msg" class="flash err" hidden></p>
+		<div id="alerts"></div>
+		<div id="list" class="grid"></div>
+
+		<h2 id="form-title">식물 등록</h2>
+		<form id="form" class="card form">
+			<input type="hidden" name="id">
+			<div class="row">
+				<label>별명 <input name="nickname" required maxlength="40" placeholder="예: 거실 스킨"></label>
+				<label>식물 종 검색 <input id="plant-search" placeholder="이름을 입력하면 찾습니다"></label>
+				<label>식물 종 <select name="plantId" id="plant-select"><option value="">(모름)</option></select></label>
+			</div>
+			<div class="row">
+				<label>방 <select name="roomId" id="room-select"><option value="">(정하지 않음)</option></select></label>
+				<label>사진 <input type="file" name="photo" accept="image/*"></label>
+				<label>메모 <input name="memo" maxlength="500"></label>
+			</div>
+			<div id="pick" class="card" hidden>
+				<p class="muted" style="margin-top:0">평면도에서 식물을 놓은 자리를 누르세요. <span id="pos"></span></p>
+				<svg id="plan" style="width:100%;max-height:360px"></svg>
+			</div>
+			<input type="hidden" name="x"><input type="hidden" name="y">
+			<button type="submit">저장</button>
+			<button type="button" id="cancel" class="secondary" hidden>취소</button>
+		</form>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', async () => {
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			const form = document.getElementById('form');
+			let items = [], rooms = [], photoId = null;
+
+			async function loadRooms() {
+				const houses = await api('/api/houses');
+				rooms = [];
+				for (const h of houses) for (const r of await api(`/api/houses/${h.id}/rooms`)) rooms.push({ ...r, houseName: h.name });
+				document.getElementById('room-select').innerHTML = '<option value="">(정하지 않음)</option>' +
+					rooms.map(r => `<option value="${r.id}">${escapeHtml(r.houseName)} · ${escapeHtml(r.name)}</option>`).join('');
+			}
+
+			async function load() {
+				items = await api('/api/my-plants');
+				document.getElementById('list').innerHTML = items.length ? items.map(p => `
+					<div class="card">
+						${p.photoFileId ? `<img src="/api/files/${p.photoFileId}/content?inline=true" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px">`
+							: p.thumbnailUrl ? `<img src="${escapeHtml(p.thumbnailUrl)}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px">` : ''}
+						<strong>${escapeHtml(p.nickname)}</strong> ${p.plantName ? `<span class="muted">${escapeHtml(p.plantName)}</span>` : ''}
+						<div class="muted">${p.roomName ? `${escapeHtml(p.roomName)} (${Math.round(p.x)}, ${Math.round(p.y)})cm` : '자리 미정'}
+							${p.currentScore != null ? ` · 지금 자리 <span class="badge ${p.currentScore < 50 ? 'warn' : ''}">${Math.round(p.currentScore)}점</span>` : ''}</div>
+						${p.memo ? `<div class="muted">${escapeHtml(p.memo)}</div>` : ''}
+						<button class="small secondary" data-edit="${p.id}">수정·옮기기</button>
+						<button class="small danger" data-del="${p.id}">삭제</button>
+					</div>`).join('') : '<p class="muted">등록한 식물이 없습니다.</p>';
+				const alerts = await api('/api/my-plants/alerts');
+				document.getElementById('alerts').innerHTML = alerts.map(a => `<p class="flash ${a.type === 'INFO' ? 'ok' : 'err'}">
+					<strong>${escapeHtml(a.nickname)}</strong>: ${escapeHtml(a.message)}${a.suggestX != null ? ` 추천 자리 (${Math.round(a.suggestX)}, ${Math.round(a.suggestY)})cm` : ''}</p>`).join('');
+			}
+
+			function drawPick() {
+				const room = rooms.find(r => String(r.id) === form.roomId.value);
+				document.getElementById('pick').hidden = !room;
+				if (!room) return;
+				const x = form.x.value ? Number(form.x.value) : null, y = form.y.value ? Number(form.y.value) : null;
+				drawRoomPlan(document.getElementById('plan'), room, [], {
+					marks: x != null ? [{ x, y, label: '식물 자리', text: '🌱', color: 'var(--accent)' }] : [] });
+				document.getElementById('pos').textContent = x != null ? `현재 (${Math.round(x)}, ${Math.round(y)})cm` : '';
+				const svg = document.getElementById('plan');
+				svg.onclick = (ev) => {
+					const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+					const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+					form.x.value = Math.round(p.x); form.y.value = Math.round(p.y); drawPick();
+				};
+			}
+
+			let timer = null;
+			document.getElementById('plant-search').addEventListener('input', (ev) => {
+				clearTimeout(timer);
+				timer = setTimeout(async () => {
+					const r = await api('/api/plants?size=30&keyword=' + encodeURIComponent(ev.target.value));
+					document.getElementById('plant-select').innerHTML = '<option value="">(모름)</option>' +
+						r.items.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+				}, 250);
+			});
+			form.roomId.addEventListener('change', () => { form.x.value = ''; form.y.value = ''; drawPick(); });
+
+			function reset() {
+				form.reset(); form.id.value = ''; form.x.value = ''; form.y.value = ''; photoId = null;
+				document.getElementById('form-title').textContent = '식물 등록';
+				document.getElementById('cancel').hidden = true; drawPick();
+			}
+			document.getElementById('cancel').addEventListener('click', reset);
+
+			document.getElementById('list').addEventListener('click', async (ev) => {
+				const del = ev.target.dataset.del, edit = ev.target.dataset.edit;
+				if (del && confirm('삭제할까요?')) { try { await api('/api/my-plants/' + del, { method: 'DELETE' }); await load(); } catch (e) { show(e); } }
+				if (edit) {
+					const p = items.find(i => String(i.id) === edit);
+					form.id.value = p.id; form.nickname.value = p.nickname; form.memo.value = p.memo || '';
+					document.getElementById('plant-select').innerHTML = `<option value="">(모름)</option>${p.plantId ? `<option value="${p.plantId}" selected>${escapeHtml(p.plantName)}</option>` : ''}`;
+					form.roomId.value = p.roomId || ''; form.x.value = p.x ?? ''; form.y.value = p.y ?? ''; photoId = p.photoFileId;
+					document.getElementById('form-title').textContent = `${p.nickname} 수정`;
+					document.getElementById('cancel').hidden = false; drawPick();
+					form.scrollIntoView({ behavior: 'smooth' });
+				}
+			});
+
+			form.addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				try {
+					const file = form.photo.files[0];
+					if (file) {
+						const fd = new FormData(); fd.append('file', file); fd.append('category', 'PLANT_PHOTO');
+						photoId = (await api('/api/files', { method: 'POST', body: fd })).id;
+					}
+					const body = { nickname: form.nickname.value, memo: form.memo.value || null,
+						plantId: form.plantId.value ? Number(form.plantId.value) : null,
+						roomId: form.roomId.value ? Number(form.roomId.value) : null,
+						x: form.x.value ? Number(form.x.value) : null, y: form.y.value ? Number(form.y.value) : null, photoFileId: photoId };
+					if (form.id.value) await api('/api/my-plants/' + form.id.value, { method: 'PUT', json: body });
+					else await api('/api/my-plants', { method: 'POST', json: body });
+					msg.hidden = true; reset(); await load();
+				} catch (e) { show(e); }
+			});
+
+			try { await loadRooms(); await load(); } catch (e) { show(e); }
+		});
+	</script>
+</body>
+</html>

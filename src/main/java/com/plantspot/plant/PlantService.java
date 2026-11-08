@@ -25,9 +25,11 @@ public class PlantService {
 	private static final Logger log = LoggerFactory.getLogger(PlantService.class);
 
 	private final PlantSpeciesRepository repository;
+	private final org.springframework.context.ApplicationEventPublisher events;
 
-	public PlantService(PlantSpeciesRepository repository) {
+	public PlantService(PlantSpeciesRepository repository, org.springframework.context.ApplicationEventPublisher events) {
 		this.repository = repository;
+		this.events = events;
 	}
 
 	public PlantPage search(String keyword, String light, String level, int page, int size) {
@@ -60,6 +62,7 @@ public class PlantService {
 		req.check();
 		PlantSpecies p = load(id);
 		p.adjust(req.name(), req.toConverted());
+		events.publishEvent(new PlantEvents.PlantChanged(id));
 		log.info("변환표 수정: {} {}", id, p.getName());
 		return PlantResponse.of(p);
 	}
@@ -68,6 +71,7 @@ public class PlantService {
 	public PlantResponse reset(Long id) {
 		PlantSpecies p = load(id);
 		p.resetConversion();
+		events.publishEvent(new PlantEvents.PlantChanged(id));
 		return PlantResponse.of(p);
 	}
 
@@ -85,7 +89,9 @@ public class PlantService {
 
 	@Transactional
 	public void delete(Long id) {
-		repository.delete(load(id));
+		PlantSpecies p = load(id);
+		events.publishEvent(new PlantEvents.PlantDeleting(id));
+		repository.delete(p);
 	}
 
 	private static String blank(String s) {
