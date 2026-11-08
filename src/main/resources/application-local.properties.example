@@ -1,0 +1,6 @@
+# 이 파일을 application-local.properties 로 복사한 뒤 키를 채운다. (application-local.properties 는 커밋 금지)
+api.kasi.service-key=
+api.kma.service-key=
+api.kma.station-id=
+api.nongsaro.api-key=
+api.vworld.key=
