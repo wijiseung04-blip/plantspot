@@ -1,83 +1,14 @@
+// 루트: 하위 프로젝트(backend, frontend)가 같은 플러그인 버전을 쓰도록 여기서만 버전을 정한다.
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '4.1.2'
-	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.springframework.boot' version '4.1.2' apply false
+	id 'io.spring.dependency-management' version '1.1.7' apply false
 }
 
-group = 'com.plantspot'
-version = '0.0.1-SNAPSHOT'
+subprojects {
+	group = 'com.plantspot'
+	version = '0.0.1-SNAPSHOT'
 
-java {
-	toolchain {
-		// 기본은 Java 26. JDK 26이 없는 환경에서는 -PjavaVersion=25 처럼 바꿔서 빌드할 수 있다.
-		languageVersion = JavaLanguageVersion.of((findProperty('javaVersion') ?: '26') as int)
+	repositories {
+		mavenCentral()
 	}
-}
-
-repositories {
-	mavenCentral()
-}
-
-dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'   // Boot 4.1 BOM이 관리하는 것은 6 (Security 7과 호환)
-	implementation 'org.xerial:sqlite-jdbc'
-	implementation 'org.hibernate.orm:hibernate-community-dialects'
-	implementation 'org.apache.pdfbox:pdfbox:3.0.8'   // 리포트 PDF
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-tasks.withType(JavaCompile).configureEach {
-	options.encoding = 'UTF-8'
-}
-
-tasks.named('test') {
-	useJUnitPlatform()
-	// sqlite-jdbc 네이티브 라이브러리 로드 경고 제거
-	jvmArgs '--enable-native-access=ALL-UNNAMED'
-}
-
-// [① DB 데이터 생성 프로그램] GIS 건물통합정보 GeoPackage → building 테이블
-// 사용: ./gradlew importBuildings -Pgpkg=경로/saha.gpkg [-Pdb=data/plantspot.db]
-tasks.register('importBuildings', JavaExec) {
-	group = 'plantspot'
-	description = 'GeoPackage 건물 데이터를 SQLite building 테이블로 가져온다.'
-	classpath = sourceSets.main.runtimeClasspath
-	mainClass = 'com.plantspot.tool.BuildingImporter'
-	workingDir = projectDir
-	jvmArgs '--enable-native-access=ALL-UNNAMED'
-	args = [findProperty('gpkg') ?: '', findProperty('db') ?: 'data/plantspot.db']
-}
-
-// [① DB 데이터 생성 프로그램] 농사로 실내정원용 식물 → plant_species (키: application-local.properties)
-// 사용: ./gradlew importPlants
-tasks.register('importPlants', JavaExec) {
-	group = 'plantspot'
-	description = '농사로 실내정원용 식물 목록·상세를 모두 받아 plant_species 테이블에 저장한다.'
-	classpath = sourceSets.main.runtimeClasspath
-	mainClass = 'com.plantspot.PlantSpotApplication'
-	workingDir = projectDir
-	jvmArgs '--enable-native-access=ALL-UNNAMED'
-	args = ['--plantspot.import=plants', '--spring.main.web-application-type=none']
-}
-
-// [① DB 데이터 생성 프로그램] 기상청 ASOS 시간자료 → weather_hour (키: application-local.properties)
-// 사용: ./gradlew collectWeather -Pfrom=2026-11-01 -Pto=2026-11-07  (생략하면 최근 7일)
-tasks.register('collectWeather', JavaExec) {
-	group = 'plantspot'
-	description = '기상청 ASOS 시간자료(일조·일사·운량)를 받아 weather_hour 테이블에 저장한다.'
-	classpath = sourceSets.main.runtimeClasspath
-	mainClass = 'com.plantspot.PlantSpotApplication'
-	workingDir = projectDir
-	jvmArgs '--enable-native-access=ALL-UNNAMED'
-	args = ['--plantspot.import=weather', '--spring.main.web-application-type=none',
-			'--from=' + (findProperty('from') ?: ''), '--to=' + (findProperty('to') ?: '')]
 }

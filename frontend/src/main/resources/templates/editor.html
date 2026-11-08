@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('평면도 햇빛 에디터')}"></head>
+<body th:data-auth="${me != null}">
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<style>
+		.editor { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; max-width: 1400px; margin: 0 auto; padding: 16px; }
+		.editor canvas { width: 100%; height: 640px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; touch-action: none; display: block; }
+		.editor .side { display: flex; flex-direction: column; gap: 12px; }
+		.editor .card { margin: 0; }
+		.editor h2 { margin: 0 0 8px; font-size: 1rem; }
+		.editor label { font-size: 0.85rem; color: var(--muted); }
+		.editor input[type=range] { padding: 0; }
+		.chip { display: inline-block; padding: 4px 10px; margin: 0 6px 6px 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent); cursor: grab; font-size: 0.85rem; user-select: none; }
+		.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+		@media (max-width: 900px) { .editor { grid-template-columns: 1fr; } .editor canvas { height: 460px; } }
+	</style>
+	<div class="editor">
+		<div>
+			<canvas id="canvas" aria-label="방 평면도 캔버스"></canvas>
+			<div class="card" style="margin-top:12px">
+				<div class="row" style="align-items:end">
+					<label>날짜 <input type="date" id="date"></label>
+					<div class="btns" id="season-buttons"></div>
+					<div><button type="button" id="play" class="small">▶ 하루 재생</button></div>
+				</div>
+				<label>시각 <strong id="time-label"></strong>
+					<input type="range" id="time" min="0" max="1435" step="5"></label>
+				<p id="sun-info" class="muted" style="margin:4px 0"></p>
+				<p id="day-info" class="muted" style="margin:0"></p>
+				<label><input type="checkbox" id="show-heat" checked> 하루 직사광 지도 (노랄수록 오래, 파랄수록 어두움)</label>
+				<label id="before-box" hidden><input type="checkbox" id="show-before" checked> 보정 전(건물 데이터만) 햇빛 경계 겹쳐 보기 <span style="color:#d97706">- - -</span></label>
+			</div>
+		</div>
+		<div class="side">
+			<div class="card">
+				<h2>방</h2>
+				<label>이름 <input id="room-name" maxlength="40"></label>
+				<div class="btns" style="margin:8px 0">
+					<button type="button" id="preset-rect" class="small secondary">직사각형</button>
+					<button type="button" id="preset-l" class="small secondary">ㄱ자</button>
+					<button type="button" id="draw" class="small secondary">직접 그리기</button>
+					<button type="button" id="fit" class="small secondary">화면 맞춤</button>
+				</div>
+				<label>평면도 위쪽 방향 <strong id="orientation-label"></strong>
+					<input type="range" id="orientation" min="0" max="355" step="5"></label>
+				<div class="row">
+					<label>천장(cm) <input type="number" id="ceiling" min="180" max="500"></label>
+					<label>계산 높이(cm) <input type="number" id="work-height" min="0" max="150" title="0 = 바닥, 화분 선반이면 그 높이"></label>
+				</div>
+				<label>커튼
+					<select id="curtain">
+						<option value="1">없음</option><option value="0.6">얇은 커튼</option><option value="0.5">블라인드</option>
+						<option value="0.2">두꺼운 커튼</option><option value="0.02">암막 커튼</option>
+					</select>
+				</label>
+				<p class="muted" style="margin:6px 0 0">꼭짓점·창문·식물은 끌어서 옮깁니다. 벽을 두 번 누르면 꼭짓점 추가, Delete 키로 지우기.</p>
+			</div>
+			<div class="card">
+				<h2>고른 것</h2>
+				<div id="selection"></div>
+			</div>
+			<div class="card">
+				<h2>위치와 창밖 가림</h2>
+				<div class="row">
+					<label>위도 <input type="number" id="lat" step="0.0001"></label>
+					<label>경도 <input type="number" id="lon" step="0.0001"></label>
+				</div>
+				<div id="obs-manual">
+					<label>창 앞 건물 가림 각도 <strong id="front-obs-label"></strong>
+						<input type="range" id="front-obs" min="0" max="70" step="1"></label>
+					<p class="muted" style="margin:0">회원은 우리 집 방을 불러오면 공공 건물 데이터로 계산한 실제 가림 각도를 씁니다.</p>
+				</div>
+				<p id="obs-server" class="muted" hidden>우리 집 건물 데이터 가림 각도(센서 실측이 있으면 반영)를 쓰고 있습니다.</p>
+			</div>
+			<div class="card">
+				<h2>식물 끌어다 놓기</h2>
+				<input id="plant-search" placeholder="식물 이름 검색" style="margin-bottom:8px">
+				<div id="palette"></div>
+				<p id="palette-hint" class="muted" style="margin:0"></p>
+				<h2 style="margin-top:12px">놓은 식물 (이 날 점수)</h2>
+				<div id="placed"></div>
+			</div>
+			<div class="card">
+				<h2>저장</h2>
+				<div class="btns">
+					<button type="button" id="export-png" class="small">배치도 PNG 저장</button>
+					<button type="button" id="export-json" class="small secondary">방 파일 내보내기</button>
+					<label class="button small secondary" style="margin:0;color:var(--accent)">방 파일 불러오기
+						<input type="file" id="import-json" accept="application/json" hidden></label>
+					<button type="button" id="reset" class="small secondary">처음 상태로</button>
+				</div>
+				<div id="server-box" hidden style="margin-top:8px">
+					<button type="button" id="save-server" class="small">우리 집 방에 저장</button>
+					<p id="server-status" class="muted" style="margin:4px 0 0"></p>
+				</div>
+				<p class="muted" style="margin:8px 0 0">로그인 없이 쓰면 이 브라우저에만 저장됩니다.</p>
+			</div>
+		</div>
+	</div>
+	<script th:src="@{/editor/solar.js}"></script>
+	<script th:src="@{/editor/light.js}"></script>
+	<script th:src="@{/editor/editor.js}" defer></script>
+</body>
+</html>

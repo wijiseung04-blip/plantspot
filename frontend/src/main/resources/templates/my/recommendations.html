@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('식물 추천')}"></head>
+<body th:data-room-id="${roomId}">
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<script th:src="@{/js/roomplan.js}" defer></script>
+	<main>
+		<p><a th:href="@{/my/rooms/{id}(id=${roomId})}">← 방으로</a></p>
+		<h1 id="title">식물 추천</h1>
+		<p id="msg" class="flash err" hidden></p>
+		<p class="muted">계절별 칸 햇빛(직사광·하늘빛)과 농사로 식물 정보(광요구도·배치장소·겨울 최저온도)를 비교한 점수입니다.
+			<button type="button" id="refresh" class="small secondary">다시 계산</button></p>
+		<div class="row">
+			<div style="flex:1 1 320px">
+				<div id="list"></div>
+			</div>
+			<div class="card" style="flex:1 1 380px">
+				<h2 id="fit-title" style="margin-top:0">식물을 고르면 칸별 적합도를 보여줍니다</h2>
+				<nav class="tabs" id="seasons">
+					<a th:each="s : ${seasons}" href="#" th:data-season="${s.value}" th:text="${s.label}"
+						th:classappend="${s.value == 'WINTER_SOLSTICE'} ? 'active'"></a>
+				</nav>
+				<svg id="plan" style="width:100%;max-height:460px"></svg>
+				<p class="muted">초록 = 잘 맞음, 빨강 = 맞지 않음. 동그라미 = 추천 자리.</p>
+				<div id="fit-notes"></div>
+			</div>
+		</div>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', () => {
+			const id = document.body.dataset.roomId;
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			let room = null, data = null, fit = null, selected = null, season = 'WINTER_SOLSTICE';
+
+			function renderList() {
+				document.getElementById('list').innerHTML = data.items.length ? data.items.map(p => `
+					<div class="card" data-plant="${p.plantId}" style="cursor:pointer;display:flex;gap:12px;${selected === p.plantId ? 'outline:2px solid var(--accent)' : ''}">
+						${p.thumbnailUrl ? `<img src="${escapeHtml(p.thumbnailUrl)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">` : ''}
+						<div><strong>${p.rank}. ${escapeHtml(p.name)}</strong> <span class="badge">${Math.round(p.score)}점</span>
+							<span class="badge ${p.type === 'FIXED' ? '' : 'warn'}">${p.type === 'FIXED' ? '고정 자리' : '계절 이동'}</span>
+							<div class="muted">${p.spots.map(s => `${s.label}: (${Math.round(s.x)}, ${Math.round(s.y)})cm ${Math.round(s.score)}점`).join(' · ')}</div>
+							${p.notes.map(n => `<div class="muted">⚠ ${escapeHtml(n)}</div>`).join('')}
+						</div>
+					</div>`).join('') : `<p class="muted">식물 정보가 없습니다 (${data.plantCount}종). 관리자가 농사로 데이터를 가져오면 추천합니다.</p>`;
+			}
+
+			function renderFit() {
+				if (!fit) { drawRoomPlan(document.getElementById('plan'), room, [], {}); return; }
+				const cells = fit.seasons[season];
+				const rec = data.items.find(p => p.plantId === selected);
+				const spots = rec ? rec.spots.filter(s => s.season === null || s.season === season) : [];
+				drawRoomPlan(document.getElementById('plan'), room, cells.map(c => ({ ...c, directMinutes: 0, lux: 0, distance: 0 })), {
+					fill: (c) => scoreColor(c.score),
+					tip: (c) => `${Math.round(c.score)}점${c.withinPlacement ? '' : ' (농사로 배치 거리 밖)'}`,
+					marks: spots.map(s => ({ x: s.x, y: s.y, label: '추천 자리', text: '★', color: 'var(--accent)' }))
+				});
+				document.getElementById('fit-title').textContent = `${fit.name} · ${Math.round(fit.score)}점`;
+				document.getElementById('fit-notes').innerHTML = fit.notes.map(n => `<p class="muted">⚠ ${escapeHtml(n)}</p>`).join('');
+			}
+
+			async function load(refresh) {
+				room = room || await api('/api/rooms/' + id);
+				document.getElementById('title').textContent = room.name + ' · 식물 추천';
+				data = refresh ? await api(`/api/rooms/${id}/recommendations/refresh`, { method: 'POST' })
+					: await api(`/api/rooms/${id}/recommendations`);
+				renderList();
+				if (!selected && data.items.length) await select(data.items[0].plantId); else renderFit();
+			}
+			async function select(plantId) {
+				selected = plantId;
+				fit = await api(`/api/rooms/${id}/recommendations/${plantId}`);
+				renderList(); renderFit();
+			}
+			load(false).catch(show);
+
+			document.getElementById('list').addEventListener('click', (ev) => {
+				const card = ev.target.closest('[data-plant]');
+				if (card) select(Number(card.dataset.plant)).catch(show);
+			});
+			document.getElementById('seasons').addEventListener('click', (ev) => {
+				if (ev.target.tagName !== 'A') return;
+				ev.preventDefault();
+				document.querySelectorAll('#seasons a').forEach(a => a.classList.toggle('active', a === ev.target));
+				season = ev.target.dataset.season; renderFit();
+			});
+			document.getElementById('refresh').addEventListener('click', () => load(true).catch(show));
+		});
+	</script>
+</body>
+</html>

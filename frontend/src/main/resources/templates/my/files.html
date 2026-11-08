@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('내 파일')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<h1>내 파일</h1>
+		<p id="msg" class="flash err" hidden></p>
+
+		<form id="upload-form" class="card form">
+			<div class="row">
+				<label>종류
+					<select name="category" id="category">
+						<option th:each="c : ${categories}" th:value="${c.value}" th:text="${c.label} + ' (' + ${c.extensions} + ')'"></option>
+					</select>
+				</label>
+				<label>파일 (최대 10MB) <input type="file" name="file" required></label>
+			</div>
+			<button type="submit">올리기</button>
+		</form>
+
+		<nav class="tabs" id="filter">
+			<a href="#" data-cat="" class="active">전체</a>
+			<a th:each="c : ${categories}" href="#" th:data-cat="${c.value}" th:text="${c.label}"></a>
+		</nav>
+		<div class="table-wrap">
+			<table>
+				<thead><tr><th>종류</th><th>이름</th><th>크기</th><th>올린 날</th><th></th></tr></thead>
+				<tbody id="files"></tbody>
+			</table>
+		</div>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', () => {
+			const msg = document.getElementById('msg');
+			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
+			let category = '';
+			const size = (b) => b < 1024 ? b + 'B' : b < 1048576 ? (b / 1024).toFixed(1) + 'KB' : (b / 1048576).toFixed(1) + 'MB';
+
+			async function load() {
+				const files = await api('/api/files' + (category ? '?category=' + category : ''));
+				document.getElementById('files').innerHTML = files.length ? files.map(f => `
+					<tr>
+						<td><span class="badge">${escapeHtml(f.categoryLabel)}</span></td>
+						<td>${f.contentType.startsWith('image/') ? `<a href="${f.downloadUrl}?inline=true" target="_blank">` : ''}${escapeHtml(f.originalName)}${f.contentType.startsWith('image/') ? '</a>' : ''}
+							${f.roomId ? `<div class="muted"><a href="/my/rooms/${f.roomId}">방 ${f.roomId}</a></div>` : ''}</td>
+						<td>${size(f.size)}</td>
+						<td>${f.createdAt.slice(0, 16).replace('T', ' ')}</td>
+						<td><a class="button small secondary" href="${f.downloadUrl}">내려받기</a>
+							<button class="small danger" data-del="${f.id}">삭제</button></td>
+					</tr>`).join('') : '<tr><td colspan="5" class="muted">파일이 없습니다.</td></tr>';
+			}
+			load().catch(show);
+
+			document.getElementById('filter').addEventListener('click', (ev) => {
+				if (ev.target.tagName !== 'A') return;
+				ev.preventDefault();
+				document.querySelectorAll('#filter a').forEach(a => a.classList.toggle('active', a === ev.target));
+				category = ev.target.dataset.cat;
+				load().catch(show);
+			});
+
+			document.getElementById('files').addEventListener('click', async (ev) => {
+				const id = ev.target.dataset.del;
+				if (!id || !confirm('파일을 삭제할까요?')) return;
+				try { await api('/api/files/' + id, { method: 'DELETE' }); await load(); } catch (e) { show(e); }
+			});
+
+			document.getElementById('upload-form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				try {
+					await api('/api/files', { method: 'POST', body: new FormData(ev.target) });
+					ev.target.reset(); msg.hidden = true; await load();
+				} catch (e) { show(e); }
+			});
+		});
+	</script>
+</body>
+</html>

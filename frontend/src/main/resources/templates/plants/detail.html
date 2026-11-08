@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('식물')}"></head>
+<body th:data-plant-id="${plantId}">
+	<header th:replace="~{fragments/layout :: header}"></header>
+	<main>
+		<p><a th:href="@{/plants}">← 식물 검색</a></p>
+		<p id="msg" class="flash err" hidden></p>
+		<div id="plant"></div>
+	</main>
+	<script th:inline="none">
+		document.addEventListener('DOMContentLoaded', async () => {
+			const id = document.body.dataset.plantId, e = escapeHtml, v = (x) => x == null || x === '' ? '-' : e(x);
+			try {
+				const p = await api('/api/plants/' + id);
+				document.title = p.name + ' · plantspot';
+				const water = [['봄', p.waterSpring], ['여름', p.waterSummer], ['가을', p.waterAutumn], ['겨울', p.waterWinter]]
+					.filter(w => w[1]).map(w => `<div>${w[0]}: ${e(w[1])}</div>`).join('') || '-';
+				document.getElementById('plant').innerHTML = `
+					<div class="row">
+						${p.imageUrl ? `<div style="flex:0 1 320px"><img src="${e(p.imageUrl)}" alt="" style="width:100%;border-radius:10px"></div>` : ''}
+						<div>
+							<h1>${e(p.name)}</h1>
+							<p class="muted"><i>${e(p.scientificName || '')}</i> ${e(p.englishName || '')} ${p.familyName ? '· ' + e(p.familyName) : ''}</p>
+							<table>
+								<tr><th>빛 요구(농사로)</th><td>${v(p.lightNames)}</td></tr>
+								<tr><th>추천 배치(농사로)</th><td>${v(p.placementNames)}</td></tr>
+								<tr><th>겨울 최저온도</th><td>${v(p.winterMinName)}</td></tr>
+								<tr><th>생육 온도</th><td>${v(p.growthTempName)}</td></tr>
+								<tr><th>습도</th><td>${v(p.humidityName)}</td></tr>
+								<tr><th>관리 수준</th><td>${v(p.manageLevelName)}</td></tr>
+								<tr><th>물주기</th><td>${water}</td></tr>
+							</table>
+							<h2>우리 서비스 추천 기준 (변환값)</h2>
+							<table>
+								<tr><th>조도</th><td>${p.minLux.toLocaleString()} ~ ${p.maxLux.toLocaleString()} lux</td></tr>
+								<tr><th>하루 직사광</th><td>${p.minDirectMinutes}분 이상${p.maxDirectMinutes != null ? ', ' + p.maxDirectMinutes + '분 이하' : ''}</td></tr>
+								<tr><th>창에서 거리</th><td>${p.minWindowDistance != null ? p.minWindowDistance + ' ~ ' + p.maxWindowDistance + 'cm' : '-'}</td></tr>
+								<tr><th>겨울 최저온도</th><td>${p.winterMinTemp != null ? p.winterMinTemp + '℃ 이상 유지' : '-'}</td></tr>
+							</table>
+							${p.adjusted ? '<p class="muted">관리자가 조정한 값입니다.</p>' : ''}
+						</div>
+					</div>
+					${p.advice ? `<div class="card"><h2 style="margin-top:0">관리 요령</h2><p>${e(p.advice)}</p></div>` : ''}
+					${p.source === 'NONGSARO' ? '<p class="muted">출처: 농촌진흥청 농사로 (실내정원용 식물)</p>' : ''}`;
+			} catch (err) { const m = document.getElementById('msg'); m.textContent = err.message; m.hidden = false; }
+		});
+	</script>
+</body>
+</html>

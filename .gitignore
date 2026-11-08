@@ -37,7 +37,8 @@ out/
 .vscode/
 
 ### plantspot ###
-/data/*.db
-/data/*.db-*
-src/main/resources/application-local.properties
-/data/uploads/
+**/src/main/resources/application-local.properties
+backend/data/uploads/
+backend/data/*.db
+backend/data/*.db-*
+
