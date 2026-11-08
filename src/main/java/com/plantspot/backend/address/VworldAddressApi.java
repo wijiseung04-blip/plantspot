@@ -82,6 +82,7 @@ public class VworldAddressApi implements AddressApi {
 			JsonNode p = item.path("point");
 			list.add(new Candidate(blank(a.path("road").asString(null)), blank(a.path("parcel").asString(null)),
 					blank(a.path("zipcode").asString(null)), blank(a.path("bldnm").asString(null)),
+					blank(a.path("bldnmdc").asString(null)),
 					Double.parseDouble(p.path("x").asString("0")), Double.parseDouble(p.path("y").asString("0"))));
 		}
 		return list;

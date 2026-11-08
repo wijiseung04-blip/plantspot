@@ -37,7 +37,11 @@
 					: '<option value="">건물 데이터 없음 (importBuildings 로 먼저 가져오기)</option>';
 			} catch (e) { show(e); }
 
+			let buildingId = null;
+			// 동·지번을 직접 고치면 주소 검색으로 고른 건물은 풀린다
+			['dong', 'jibun'].forEach(n => document.querySelector(`#house-form [name=${n}]`).addEventListener('input', () => buildingId = null));
 			addressSearch(document.getElementById('address-box'), (b) => {
+				buildingId = b.buildingId;
 				selectDong(document.getElementById('dong'), b.dong);
 				document.querySelector('#house-form [name=jibun]').value = b.jibun;
 				const name = document.querySelector('#house-form [name=name]');
@@ -60,7 +64,7 @@
 				const f = new FormData(ev.target);
 				try {
 					const h = await api('/api/houses', { method: 'POST', json: {
-						dong: f.get('dong'), jibun: f.get('jibun').trim(), name: f.get('name'),
+						dong: f.get('dong'), jibun: f.get('jibun').trim(), name: f.get('name'), buildingId,
 						floor: Number(f.get('floor')), floorHeight: f.get('floorHeight') ? Number(f.get('floorHeight')) : null } });
 					location.href = '/my/houses/' + h.id;
 				} catch (e) { show(e); }

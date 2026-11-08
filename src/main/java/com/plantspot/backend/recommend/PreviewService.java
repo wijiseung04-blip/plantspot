@@ -60,11 +60,13 @@ public class PreviewService {
 			@NotNull(message = "층을 입력하세요.") @Min(value = 1, message = "층은 1 이상입니다.")
 			@Max(value = 80, message = "층은 80 이하입니다.") Integer floor,
 			@NotNull(message = "창 방향을 선택하세요.") @DecimalMin(value = "0", message = "창 방향은 0~360도입니다.")
-			@DecimalMax(value = "360", message = "창 방향은 0~360도입니다.") Double windowAzimuth) {
+			@DecimalMax(value = "360", message = "창 방향은 0~360도입니다.") Double windowAzimuth,
+			/** 같은 지번에 건물이 여러 동일 때 고른 건물 (없으면 가장 높은 건물) */
+			Long buildingId) {
 	}
 
 	public PreviewResult preview(PreviewRequest req) {
-		Building b = buildingService.findByAddress(req.dong(), req.jibun()).get(0);
+		Building b = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
 		double eye = (req.floor() - 1) * 3.0 + ObstructionService.EYE_ABOVE_FLOOR_M;
 		var sky = obstructionService.computeFromBuildings(b.getCenterX(), b.getCenterY(), eye, b.getId());
 		ObstructionProfile profile = new ObstructionProfile(sky.angles(), ObstructionProfile.empty().sensor());

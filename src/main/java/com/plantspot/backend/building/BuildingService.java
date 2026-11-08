@@ -32,6 +32,21 @@ public class BuildingService {
 		return found;
 	}
 
+	/**
+	 * 동·지번에서 건물 하나 고르기. buildingId 를 주면 그 건물(같은 동·지번인지 확인),
+	 * 없으면 가장 높은 건물(아파트 단지면 관리동·경비실이 아니라 주거동이 골라지도록), 같으면 넓은 건물.
+	 */
+	public Building choose(String dong, String jibun, Long buildingId) {
+		List<Building> found = findByAddress(dong, jibun);
+		if (buildingId != null) {
+			return found.stream().filter(b -> b.getId().equals(buildingId)).findFirst()
+					.orElseThrow(() -> new IllegalArgumentException("고른 건물이 " + dong + " " + jibun + " 에 없습니다."));
+		}
+		return found.stream()
+				.max(Comparator.comparingDouble(Building::getHeight).thenComparingDouble(Building::getArea))
+				.orElseThrow();
+	}
+
 	/** 기준 건물(동·지번 중 가장 큰 건물) 주변 radius(m) 안의 건물. 가까운 순. */
 	public Nearby nearby(String dong, String jibun, double radius) {
 		Building base = findByAddress(dong, jibun).get(0);
