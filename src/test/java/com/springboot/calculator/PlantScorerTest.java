@@ -38,14 +38,36 @@ class PlantScorerTest {
 		assertThat(PlantScorer.score(shade, cell(500, 240, 50))).isLessThan(50);
 		PlantSpecies sun = plant(1500, 10000, 120, null, null, null, null);
 		assertThat(PlantScorer.score(sun, cell(2000, 0, 50))).isLessThan(40);
-		assertThat(PlantScorer.score(sun, cell(2000, 180, 50))).isEqualTo(100.0);
+		assertThat(PlantScorer.score(sun, cell(4000, 180, 50))).isEqualTo(100.0);
 	}
 
 	@Test
-	void 농사로_배치_거리_밖은_조금_감점() {
+	void 범위_끝으로_갈수록_조금씩_감점() {
+		PlantSpecies mid = plant(800, 1500, 0, 180, null, null, null);
+		assertThat(PlantScorer.score(mid, cell(1100, 0, 100))).isEqualTo(100.0); // 가운데
+		assertThat(PlantScorer.score(mid, cell(800, 0, 100))).isEqualTo(80.0); // 범위 끝
+		assertThat(PlantScorer.score(mid, cell(850, 0, 100))).isBetween(80.0, 100.0);
+		assertThat(PlantScorer.score(mid, cell(700, 0, 100))).isLessThan(80); // 범위 밖은 더 낮다
+	}
+
+	@Test
+	void 농사로_배치_거리에서_벗어난_만큼_감점() {
 		PlantSpecies p = plant(300, 10000, 0, null, 0, 50, null);
-		assertThat(PlantScorer.score(p, cell(1000, 0, 30))).isEqualTo(100.0);
-		assertThat(PlantScorer.score(p, cell(1000, 0, 200))).isEqualTo(85.0);
+		assertThat(PlantScorer.score(p, cell(1700, 0, 30))).isEqualTo(100.0);
+		assertThat(PlantScorer.score(p, cell(1700, 0, 125))).isEqualTo(85.0); // 75cm 벗어남
+		assertThat(PlantScorer.score(p, cell(1700, 0, 400))).isEqualTo(70.0); // 150cm 이상
+	}
+
+	@Test
+	void 잘_맞는_자리가_많은_방이_점수가_높다() {
+		PlantSpecies p = plant(800, 1500, 0, 180, null, null, null);
+		List<Cell> few = List.of(cell(1100, 0, 100), cell(200, 0, 300), cell(200, 0, 400), cell(200, 0, 500));
+		List<Cell> many = List.of(cell(1100, 0, 100), cell(1100, 0, 150), cell(1100, 0, 200), cell(200, 0, 500));
+		PlantScorer.PlantResult a = PlantScorer.evaluate(p, seasons(few, few, few, few), null);
+		PlantScorer.PlantResult b = PlantScorer.evaluate(p, seasons(many, many, many, many), null);
+		assertThat(a.score()).isEqualTo(92.5); // 100 × 0.9 + 25% × 10
+		assertThat(b.score()).isEqualTo(97.5);
+		assertThat(b.notes()).anyMatch(n -> n.contains("75%"));
 	}
 
 	private static Map<SeasonDay, List<Cell>> seasons(List<Cell> spring, List<Cell> summer, List<Cell> autumn,
