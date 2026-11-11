@@ -87,6 +87,17 @@ public final class BuildingFacade {
 		return new Observer(ox, oy, Math.hypot(ox - cx, oy - cy));
 	}
 
+	/**
+	 * 관측점이 우리 건물 바깥(외벽 앞)에 있어 우리 건물도 가림물로 넣어도 되는가.
+	 * 외곽선이 없거나(관측점 = 중심) 관측점이 외곽선 안이면 false → 우리 건물은 빼고 계산한다.
+	 * 바깥이면 넣는다: ㄷ자·ㄱ자 건물의 다른 날개가 창 앞을 가리는 것이 잡히고,
+	 * 창이 붙은 벽은 관측점보다 0.5m 뒤라 창 뒤쪽 방향으로만 잡혀 햇빛 계산에 영향이 없다.
+	 */
+	public static boolean canSeeOwnBuilding(String wkt, Observer o) {
+		List<List<double[]>> rings = Wkt.rings(wkt);
+		return points(rings).size() >= 3 && o.offsetFromCenter() > 0 && !inside(rings, o.x(), o.y());
+	}
+
 	/** 방향(도)의 단위 벡터 (x = 동, y = 북). */
 	static double[] unit(double deg) {
 		double r = Math.toRadians(deg);
