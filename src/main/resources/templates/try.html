@@ -15,6 +15,7 @@
 				<label>동 <select name="dong" id="dong" required></select></label>
 				<label>지번 <input name="jibun" placeholder="예: 1160-6" required></label>
 				<label>층 <input name="floor" type="number" min="1" max="80" value="3" required></label>
+				<label>동 안 위치 <select name="unitPosition"></select></label>
 				<label>창 방향
 					<select name="windowAzimuth">
 						<option value="180">남</option><option value="135">남동</option><option value="225">남서</option>
@@ -60,9 +61,14 @@
 			} catch (e) { show(e); }
 
 			let buildingId = null;
-			['dong', 'jibun'].forEach(n => document.querySelector(`#form [name=${n}]`).addEventListener('input', () => buildingId = null));
+			const unit = document.querySelector('#form [name=unitPosition]');
+			fillUnitPosition(unit, null, 0);
+			['dong', 'jibun'].forEach(n => document.querySelector(`#form [name=${n}]`).addEventListener('input', () => {
+				buildingId = null; fillUnitPosition(unit, null, 0);
+			}));
 			addressSearch(document.getElementById('address-box'), (b) => {
 				buildingId = b.buildingId;
+				fillUnitPosition(unit, b.axis ?? null, Number(unit.value));
 				selectDong(document.getElementById('dong'), b.dong);
 				document.querySelector('#form [name=jibun]').value = b.jibun;
 			});
@@ -88,7 +94,8 @@
 				const f = new FormData(ev.target);
 				try {
 					const r = await api('/api/preview', { method: 'POST', json: {
-						dong: f.get('dong'), jibun: f.get('jibun').trim(), floor: Number(f.get('floor')), windowAzimuth: Number(f.get('windowAzimuth')), buildingId } });
+						dong: f.get('dong'), jibun: f.get('jibun').trim(), floor: Number(f.get('floor')), windowAzimuth: Number(f.get('windowAzimuth')), buildingId,
+						unitPosition: Number(unit.value) } });
 					msg.hidden = true;
 					document.getElementById('result').hidden = false;
 					document.getElementById('headline').textContent =

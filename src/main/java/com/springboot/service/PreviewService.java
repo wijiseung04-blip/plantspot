@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.springboot.domain.Building;
 import com.springboot.domain.Point;
 import com.springboot.calculator.Shape;
+import com.springboot.calculator.BuildingFacade;
 import com.springboot.calculator.ObstructionProfile;
 import com.springboot.calculator.SolarCalculator;
 import com.springboot.domain.LightLevel;
@@ -60,15 +61,20 @@ public class PreviewService {
 			@NotNull(message = "창 방향을 선택하세요.") @DecimalMin(value = "0", message = "창 방향은 0~360도입니다.")
 			@DecimalMax(value = "360", message = "창 방향은 0~360도입니다.") Double windowAzimuth,
 			/** 같은 지번에 건물이 여러 동일 때 고른 건물 (없으면 가장 높은 건물) */
-			Long buildingId) {
+			Long buildingId,
+			/** 동 안 세대 위치 −1 ~ 1 (없으면 가운데) */
+			@DecimalMin(value = "-1", message = "세대 위치는 -1~1입니다.")
+			@DecimalMax(value = "1", message = "세대 위치는 -1~1입니다.") Double unitPosition) {
 	}
 
 	public PreviewResult preview(PreviewRequest req) {
 		Building b = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
 		double eye = (req.floor() - 1) * 3.0 + ObstructionService.EYE_ABOVE_FLOOR_M;
-		ObstructionProfile profile = obstructionService.publicProfile(b.getCenterX(), b.getCenterY(), eye, b.getId());
-
 		double azimuth = Shape.normalize(req.windowAzimuth());
+		// 창 관측점: 우리 건물 외벽(창 방향) 바로 앞
+		BuildingFacade.Observer o = BuildingFacade.observer(b.getFootprintWkt(), b.getCenterX(), b.getCenterY(),
+				azimuth, req.unitPosition() != null ? req.unitPosition() : 0);
+		ObstructionProfile profile = obstructionService.publicProfile(o.x(), o.y(), eye, b.getId());
 		// 2번 벽(아래쪽)이 창 벽: 평면도를 돌려 그 벽이 창 방향을 보게 한다
 		double orientation = Shape.normalize(azimuth - 180);
 		var room = SunlightCalculator.room(ROOM, orientation, 230,

@@ -66,7 +66,7 @@ public class HouseService {
 	public HouseResponse createHouse(LoginMember me, CreateHouse req) {
 		Building building = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
 		House house = houses.save(new House(memberService.get(me.getId()), building, req.name().trim(), req.floor(),
-				req.floorHeight() != null ? req.floorHeight() : DEFAULT_FLOOR_HEIGHT));
+				req.floorHeight() != null ? req.floorHeight() : DEFAULT_FLOOR_HEIGHT, req.unitPosition()));
 		log.info("집 등록: {} {} {} (회원 {})", house.getId(), req.dong(), req.jibun(), me.getUsername());
 		return HouseResponse.of(house);
 	}
@@ -90,10 +90,14 @@ public class HouseService {
 	public HouseResponse updateHouse(LoginMember me, Long houseId, UpdateHouse req) {
 		House house = loadHouse(me, houseId);
 		double oldElevation = house.floorElevation();
+		double oldPosition = house.unitPosition();
 		house.update(req.name().trim(), req.floor(),
 				req.floorHeight() != null ? req.floorHeight() : house.getFloorHeight());
-		if (house.floorElevation() != oldElevation) {
-			// 눈 높이가 바뀌었으니 가림 각도·햇빛 계산을 다시 해야 한다
+		if (req.unitPosition() != null) {
+			house.moveUnit(req.unitPosition());
+		}
+		if (house.floorElevation() != oldElevation || house.unitPosition() != oldPosition) {
+			// 눈 높이·관측 위치가 바뀌었으니 가림 각도·햇빛 계산을 다시 해야 한다
 			events.publishEvent(new HouseEvents.HouseChanged(house.getId()));
 		}
 		return HouseResponse.of(house);

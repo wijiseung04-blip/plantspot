@@ -19,13 +19,19 @@ public final class HouseResponses {
 
 	public record HouseResponse(Long id, String name, String dong, String jibun, int floor, double floorHeight,
 			double latitude, double longitude, Double buildingHeight, HeightSource buildingHeightSource,
-			int roomCount) {
+			int roomCount, double unitPosition, Double buildingAxis) {
 
 		public static HouseResponse of(House h) {
+			Double axis = null;
+			if (h.getBuilding() != null) {
+				double a = com.springboot.calculator.BuildingFacade.longAxis(h.getBuilding().getFootprintWkt());
+				axis = Double.isNaN(a) ? null : a;
+			}
 			return new HouseResponse(h.getId(), h.getName(), h.getDong(), h.getJibun(), h.getFloor(),
 					h.getFloorHeight(), h.getLatitude(), h.getLongitude(),
 					h.getBuilding() != null ? h.getBuilding().getHeight() : null,
-					h.getBuilding() != null ? h.getBuilding().getHeightSource() : null, h.getRooms().size());
+					h.getBuilding() != null ? h.getBuilding().getHeightSource() : null, h.getRooms().size(),
+					h.unitPosition(), axis);
 		}
 	}
 
