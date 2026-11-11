@@ -55,9 +55,9 @@
 				if (!keyword) document.getElementById('count').textContent = r.total;
 				document.getElementById('rows').innerHTML = r.items.map(p => `
 					<tr data-id="${p.id}">
-						<td><a href="/plants/${p.id}">${escapeHtml(p.name)}</a>${p.adjusted ? ' <span class="badge warn">조정됨</span>' : ''}${p.source === 'MANUAL' ? ' <span class="badge">직접</span>' : ''}</td>
-						<td class="muted">${escapeHtml(p.lightNames || '-')}</td>
-						${fields.map(f => `<td><input name="${f}" type="number" value="${p[f] ?? ''}" style="width:88px"></td>`).join('')}
+						<td style="min-width:120px;word-break:keep-all"><a href="/plants/${p.id}">${escapeHtml(p.name)}</a>${p.adjusted ? ' <span class="badge warn">조정됨</span>' : ''}${p.source === 'MANUAL' ? ' <span class="badge">직접</span>' : ''}</td>
+						<td class="muted" style="min-width:140px;word-break:keep-all">${escapeHtml(p.lightNames || '-')}</td>
+						${fields.map(f => `<td><input name="${f}" type="number" value="${p[f] ?? ''}" style="width:84px;min-width:84px"></td>`).join('')}
 						<td style="white-space:nowrap"><button class="small" data-act="save">저장</button>
 							<button class="small secondary" data-act="reset">자동값</button>
 							<button class="small danger" data-act="del">삭제</button></td>
