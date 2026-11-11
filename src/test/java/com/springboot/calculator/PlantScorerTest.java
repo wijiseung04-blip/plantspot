@@ -67,7 +67,8 @@ class PlantScorerTest {
 		PlantScorer.PlantResult b = PlantScorer.evaluate(p, seasons(many, many, many, many), null);
 		assertThat(a.score()).isEqualTo(92.5); // 100 × 0.9 + 25% × 10
 		assertThat(b.score()).isEqualTo(97.5);
-		assertThat(b.notes()).anyMatch(n -> n.contains("75%"));
+		assertThat(b.roomyShare()).isEqualTo(0.75);
+		assertThat(b.notes()).noneMatch(n -> n.contains("%")); // 비율은 주의 사항이 아니라 따로 보여 준다
 	}
 
 	private static Map<SeasonDay, List<Cell>> seasons(List<Cell> spring, List<Cell> summer, List<Cell> autumn,

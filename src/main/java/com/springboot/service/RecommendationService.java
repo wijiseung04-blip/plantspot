@@ -114,9 +114,11 @@ public class RecommendationService {
 					.toList();
 			list.add(new PlantRecommendation(first.getRank(), p.getId(), p.getName(), p.getThumbnailUrl(),
 					p.getLightNames(), p.getManageLevelCode(), p.getManageLevelName(), first.getSpotType(),
-					first.getScore(), spots,
+					first.getScore(), null, spots,
 					first.getNotes() == null || first.getNotes().isBlank() ? List.of()
-							: List.of(first.getNotes().split("\n"))));
+							: java.util.Arrays.stream(first.getNotes().split("\n"))
+									.filter(n -> !n.startsWith("1년 내내 잘 맞는(")) // 예전에 주의 사항으로 저장된 안내
+									.toList()));
 		}
 		return new RecommendationView(room.getId(), room.getName(), plantService.count(), list,
 				rows.isEmpty() ? null : rows.get(0).getComputedAt().toString());
@@ -148,7 +150,8 @@ public class RecommendationService {
 							.map(s -> new SpotView(s.season(), s.season().getLabel(), s.cell().x(), s.cell().y(), s.score()))
 							.toList();
 			list.add(new PlantRecommendation(i + 1, p.getId(), p.getName(), p.getThumbnailUrl(), p.getLightNames(),
-					p.getManageLevelCode(), p.getManageLevelName(), r.type(), r.score(), spots, r.notes()));
+					p.getManageLevelCode(), p.getManageLevelName(), r.type(), r.score(), percent(r.roomyShare()), spots,
+					r.notes()));
 		}
 		return new RecommendationView(room.getId(), room.getName(), list.size(), list, null);
 	}
@@ -164,7 +167,11 @@ public class RecommendationService {
 				.map(c -> new CellScore(c.x(), c.y(), PlantScorer.score(p, c), PlantScorer.withinPlacement(p, c)))
 				.toList()));
 		PlantResult r = PlantScorer.evaluate(p, seasons, room.getWinterMinTemp());
-		return new PlantFit(p.getId(), p.getName(), r.type(), r.score(), r.notes(), map);
+		return new PlantFit(p.getId(), p.getName(), r.type(), r.score(), percent(r.roomyShare()), r.notes(), map);
+	}
+
+	private static int percent(double share) {
+		return (int) Math.round(share * 100);
 	}
 
 	// ----- 낡은 결과 지우기 -----
@@ -208,7 +215,9 @@ public class RecommendationService {
 
 	/** manageLevelCode: 농사로 관리 수준 (089001 초보자 / 089002 경험자 / 089003 전문가, 없으면 null) */
 	public record PlantRecommendation(int rank, Long plantId, String name, String thumbnailUrl, String lightNames,
-			String manageLevelCode, String manageLevelName, SpotType type, double score, List<SpotView> spots, List<String> notes) {
+			String manageLevelCode, String manageLevelName, SpotType type, double score,
+			/** 1년 내내 잘 맞는(80점 이상) 칸이 방에서 차지하는 비율(%), 저장된 추천은 null */ Integer roomyPercent,
+			List<SpotView> spots, List<String> notes) {
 	}
 
 	public record RecommendationView(Long roomId, String roomName, long plantCount, List<PlantRecommendation> items,
@@ -218,7 +227,7 @@ public class RecommendationService {
 	public record CellScore(double x, double y, double score, boolean withinPlacement) {
 	}
 
-	public record PlantFit(Long plantId, String name, SpotType type, double score, List<String> notes,
+	public record PlantFit(Long plantId, String name, SpotType type, double score, int roomyPercent, List<String> notes,
 			Map<SeasonDay, List<CellScore>> seasons) {
 	}
 }

@@ -78,6 +78,7 @@
 						<div><strong>${p.rank}위. ${escapeHtml(p.name)}</strong> <span class="badge">${Math.round(p.score)}점</span>
 							<span class="badge ${p.type === 'FIXED' ? '' : 'warn'}">${p.type === 'FIXED' ? '고정 자리' : '계절 이동'}</span>
 							${p.manageLevelName ? `<span class="badge">${escapeHtml(p.manageLevelName)}</span>` : ''}
+							${p.roomyPercent != null ? `<div class="muted" title="1년 내내 80점 이상인 칸의 비율">잘 맞는 자리: 방의 ${p.roomyPercent}%</div>` : ''}
 							<div class="muted">${p.spots.map(s => `${s.label}: (${Math.round(s.x)}, ${Math.round(s.y)})cm ${Math.round(s.score)}점`).join(' · ')}</div>
 							${p.notes.map(n => `<div class="muted">⚠ ${escapeHtml(n)}</div>`).join('')}
 						</div>
@@ -94,7 +95,7 @@
 					tip: (c) => `${Math.round(c.score)}점${c.withinPlacement ? '' : ' (농사로 배치 거리 밖)'}`,
 					marks: spots.map(s => ({ x: s.x, y: s.y, label: '추천 자리', text: '★', color: 'var(--accent)' }))
 				});
-				document.getElementById('fit-title').textContent = `${fit.name} · ${Math.round(fit.score)}점`;
+				document.getElementById('fit-title').textContent = `${fit.name} · ${Math.round(fit.score)}점 · 잘 맞는 자리 ${fit.roomyPercent}%`;
 				document.getElementById('fit-notes').innerHTML = fit.notes.map(n => `<p class="muted">⚠ ${escapeHtml(n)}</p>`).join('');
 			}
 
@@ -132,7 +133,8 @@
 								<h2 style="margin-top:0">${e(p.name)}</h2>
 								${p.scientificName ? `<p class="muted"><i>${e(p.scientificName)}</i>${p.familyName ? ' · ' + e(p.familyName) : ''}</p>` : ''}
 								${rec ? `<p><span class="badge">이 방 ${Math.round(rec.score)}점 · 전체 ${data.items.length}종 중 ${rec.rank}위</span>
-									<span class="badge ${rec.type === 'FIXED' ? '' : 'warn'}">${rec.type === 'FIXED' ? '고정 자리' : '계절 이동'}</span></p>` : ''}
+									<span class="badge ${rec.type === 'FIXED' ? '' : 'warn'}">${rec.type === 'FIXED' ? '고정 자리' : '계절 이동'}</span></p>
+									${rec.roomyPercent != null ? `<p class="muted">1년 내내 잘 맞는(80점 이상) 자리가 방의 ${rec.roomyPercent}%입니다.</p>` : ''}` : ''}
 							</div>
 						</div>
 						<div class="table-wrap"><table>
