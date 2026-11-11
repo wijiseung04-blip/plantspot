@@ -46,14 +46,14 @@ src/main/java/com/springboot
 ├── repository/   (퍼시스턴트) Spring Data JPA 리포지토리
 ├── domain/       JPA 엔티티·enum (Member, Building, House, Room, RoomWindow, PlantSpecies, SunlightCell …)
 ├── dto/          요청·응답 객체 (HouseRequests, HouseResponses, SignupForm …)
-├── calculator/   계산 로직 (SolarCalculator, ObstructionCalculator, BuildingFacade, TerrainCalculator, SunlightCalculator, PlantScorer, TmConverter …)
+├── calculator/   계산 로직 (SolarCalculator, ObstructionCalculator, BuildingFacade, FloorRule, TerrainCalculator, SunlightCalculator, PlantScorer, TmConverter …)
 ├── client/       외부 API 호출 (농사로·천문연·기상청·브이월드)
 ├── report/       PDF·PNG 만들기 (PdfWriter, RoomPlanRenderer, KoreanFont)
 ├── tool/         ① 데이터 생성 프로그램 (BuildingImporter, PlantImportRunner, WeatherCollectRunner, TerrainImportRunner, GpkgGeometryReader, AscGridReader)
 ├── config/       SecurityConfig, PasswordConfig, AdminInitializer, DataDirectoryInitializer, SchemaUpgrade(예전 DB의 enum check 제약 고치기)
 ├── security/     LoginMember (로그인 회원)
 ├── event/        HouseEvents, PlantEvents (계산 결과를 낡게 만드는 변경 알림)
-└── exception/    예외·GlobalExceptionHandler·ErrorResponse
+└── exception/    예외(NotFound·Forbidden·Conflict·InvalidValue 등)·GlobalExceptionHandler·ErrorResponse
 src/main/resources
 ├── templates/    화면 (Thymeleaf)
 ├── static/       css, js(api.js 등), editor/ (② 평면도 햇빛 에디터)
@@ -75,7 +75,7 @@ data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 J
 
 ## 4. 현재 코드 상태 (아두이노 전까지 구현)
 
-빌드·테스트: `./gradlew build` (단위·API·화면 테스트 165개). 서버를 실행해 브라우저로도 확인함.
+빌드·테스트: `./gradlew build` (단위·API·화면 테스트 179개). 서버를 실행해 브라우저로도 확인함.
 테스트도 같은 계층 패키지(`src/test/java/com/springboot/controller|service|calculator|client|tool`, 공용 도구는 `support`).
 `src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
@@ -121,6 +121,10 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 - 사하구 품질: 높이 있음 38%, 층수 있음 60%, 둘 다 없음 40%(대부분 건축물대장 미연계 소형 건물, 면적 가운데값 33㎡). **10층 이상 721동 중 93%는 높이 있음**
 - 입력 오류 존재(예: 높이 15,400m)
 - 파일명 규칙: `AL_D010_26_YYYYMMDD` = 부산 전체, `CH_...` = 일별 변경분(U/I/D)
+
+**FloorRule (층 검증)**: 집 등록·수정·비회원 예측에서 층 > 고를 수 있는 최대 층이면 400 (`InvalidValueException`)
+- 최대 층 = 지상층수(A26), 없고 높이 MEASURED 면 높이 ÷ 2.5m 올림, 둘 다 없으면 막지 않고 응답 `floorWarning` 으로 안내
+- 응답에 `maxFloor`·`floorWarning`, 건물 데이터를 다시 가져와 층수가 줄면 기존 집은 경고만
 
 **HeightRule (구현됨)**
 - 높이 > 0 이고 ≤ 200m 이고 (층수 있으면) 높이/층수 ≤ 10m → 그대로 (MEASURED)

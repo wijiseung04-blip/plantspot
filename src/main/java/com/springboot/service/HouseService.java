@@ -1,5 +1,7 @@
 package com.springboot.service;
 
+import com.springboot.calculator.FloorRule;
+import com.springboot.exception.InvalidValueException;
 import com.springboot.calculator.Shape;
 import com.springboot.domain.CurtainType;
 import com.springboot.domain.House;
@@ -65,6 +67,7 @@ public class HouseService {
 	@Transactional
 	public HouseResponse createHouse(LoginMember me, CreateHouse req) {
 		Building building = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
+		checkFloor(building, req.floor());
 		House house = houses.save(new House(memberService.get(me.getId()), building, req.name().trim(), req.floor(),
 				req.floorHeight() != null ? req.floorHeight() : DEFAULT_FLOOR_HEIGHT, req.unitPosition()));
 		log.info("집 등록: {} {} {} (회원 {})", house.getId(), req.dong(), req.jibun(), me.getUsername());
@@ -79,6 +82,14 @@ public class HouseService {
 		return HouseResponse.of(loadHouse(me, houseId));
 	}
 
+	/** 건물 층수(또는 실측 높이)보다 높은 층이면 400. 층수를 모르는 건물은 막지 않는다. */
+	public static void checkFloor(Building building, int floor) {
+		String error = FloorRule.violation(building, floor);
+		if (error != null) {
+			throw new InvalidValueException("floor", error);
+		}
+	}
+
 	/** 다른 서비스가 트랜잭션 안에서 쓰는 엔티티 조회 (본인 확인 포함). */
 	public House loadHouse(LoginMember me, Long houseId) {
 		House house = houses.findById(houseId).orElseThrow(() -> new NotFoundException("집을 찾을 수 없습니다."));
@@ -89,6 +100,7 @@ public class HouseService {
 	@Transactional
 	public HouseResponse updateHouse(LoginMember me, Long houseId, UpdateHouse req) {
 		House house = loadHouse(me, houseId);
+		checkFloor(house.getBuilding(), req.floor());
 		double oldElevation = house.floorElevation();
 		double oldPosition = house.unitPosition();
 		house.update(req.name().trim(), req.floor(),

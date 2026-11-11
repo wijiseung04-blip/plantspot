@@ -19,7 +19,9 @@ public final class HouseResponses {
 
 	public record HouseResponse(Long id, String name, String dong, String jibun, int floor, double floorHeight,
 			double latitude, double longitude, Double buildingHeight, HeightSource buildingHeightSource,
-			int roomCount, double unitPosition, Double buildingAxis) {
+			int roomCount, double unitPosition, Double buildingAxis,
+			/** 건물에서 고를 수 있는 가장 높은 층 (모르면 null) */ Integer maxFloor,
+			/** 층수를 확인하지 못했거나 이미 범위를 넘은 집일 때 안내 */ String floorWarning) {
 
 		public static HouseResponse of(House h) {
 			Double axis = null;
@@ -31,7 +33,16 @@ public final class HouseResponses {
 					h.getFloorHeight(), h.getLatitude(), h.getLongitude(),
 					h.getBuilding() != null ? h.getBuilding().getHeight() : null,
 					h.getBuilding() != null ? h.getBuilding().getHeightSource() : null, h.getRooms().size(),
-					h.unitPosition(), axis);
+					h.unitPosition(), axis, com.springboot.calculator.FloorRule.maxFloor(h.getBuilding()),
+					floorWarning(h));
+		}
+
+		private static String floorWarning(House h) {
+			String over = com.springboot.calculator.FloorRule.violation(h.getBuilding(), h.getFloor());
+			if (over != null) {
+				return "등록된 층(" + h.getFloor() + "층)이 건물 범위를 넘습니다. " + over;
+			}
+			return h.getBuilding() == null ? null : com.springboot.calculator.FloorRule.warning(h.getBuilding());
 		}
 	}
 

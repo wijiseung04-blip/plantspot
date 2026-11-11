@@ -15,6 +15,7 @@ import com.springboot.domain.Building;
 import com.springboot.domain.Point;
 import com.springboot.calculator.Shape;
 import com.springboot.calculator.BuildingFacade;
+import com.springboot.calculator.FloorRule;
 import com.springboot.calculator.ObstructionProfile;
 import com.springboot.calculator.SolarCalculator;
 import com.springboot.domain.LightLevel;
@@ -69,6 +70,7 @@ public class PreviewService {
 
 	public PreviewResult preview(PreviewRequest req) {
 		Building b = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
+		HouseService.checkFloor(b, req.floor());
 		double eye = (req.floor() - 1) * 3.0 + ObstructionService.EYE_ABOVE_FLOOR_M;
 		double azimuth = Shape.normalize(req.windowAzimuth());
 		// 창 관측점: 우리 건물 외벽(창 방향) 바로 앞
@@ -107,7 +109,7 @@ public class PreviewService {
 		double front = profile.averageAngle(azimuth, 45);
 		return new PreviewResult(b.getDong(), b.getJibun(), b.getHeight(), req.floor(), azimuth,
 				Shape.directionName(azimuth), Math.round(front * 10) / 10.0, skyline, seasonList, plants,
-				plantService.count());
+				plantService.count(), FloorRule.maxFloor(b), FloorRule.warning(b));
 	}
 
 	/** 창에서 거리 구간의 평균 직사광·조도와 밝기 단계. */
@@ -134,6 +136,8 @@ public class PreviewService {
 
 	public record PreviewResult(String dong, String jibun, double buildingHeight, int floor, double windowAzimuth,
 			String direction, double frontObstructionDeg, List<Double> skyline, List<SeasonPreview> seasons,
-			List<PreviewPlant> plants, long plantCount) {
+			List<PreviewPlant> plants, long plantCount,
+			/** 건물에서 고를 수 있는 가장 높은 층 (모르면 null) */ Integer maxFloor,
+			/** 층수를 확인하지 못했을 때 안내 */ String floorWarning) {
 	}
 }

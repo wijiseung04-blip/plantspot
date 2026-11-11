@@ -102,6 +102,12 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.CONTENT_TOO_LARGE, "파일이 너무 큽니다.", req);
 	}
 
+	@ExceptionHandler(InvalidValueException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidValue(InvalidValueException e, HttpServletRequest req) {
+		log.info("값 검증 실패 [{}]: {} ({})", e.getField(), e.getMessage(), req.getRequestURI());
+		return build(HttpStatus.BAD_REQUEST, e.getMessage(), req);
+	}
+
 	@ExceptionHandler(IllegalArgumentException.class)
 	public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException e, HttpServletRequest req) {
 		return build(HttpStatus.BAD_REQUEST, e.getMessage(), req);
