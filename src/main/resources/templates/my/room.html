@@ -23,6 +23,23 @@
 			</div>
 		</div>
 
+		<section id="sky-section" hidden>
+			<h2>창별 스카이라인</h2>
+			<p class="muted">창마다 우리 세대 외벽 바로 앞에서 본 하늘입니다. 가운데가 머리 위(90°), 바깥 원이 지평선(0°).
+				색칠된 부분이 가려진 하늘이고, 방향마다 <b>가장 높게 가린 원인 하나</b>를 보여 줍니다. 마우스를 올리면 원인 건물과 거리가 나옵니다.</p>
+			<p class="sky-legend">
+				<span><i style="background:#6b7280"></i>우리 건물</span>
+				<span><i style="background:var(--accent)"></i>옆 건물</span>
+				<span><i style="background:#8d6e4a"></i>산·지형</span>
+				<span><i style="background:var(--warn)"></i>센서 실측</span>
+				<span><i class="hatch"></i>창 뒤쪽(벽 — 창이 볼 수 없는 방향)</span>
+				<span><b style="color:#3b82f6">●</b> 동지 · <b style="color:#e0a400">●</b> 춘분·추분 · <b style="color:#e5484d">●</b> 하지 해 경로 (속이 빈 점 = 해가 가려지거나 창 뒤쪽)</span>
+			</p>
+			<div id="window-skies" class="grid"></div>
+			<p class="muted">여름 한낮처럼 해가 아주 높을 때 햇빛이 창가 바닥에만 드는 것은 가림이 아니라 창 높이 때문입니다 (계절별 햇빛 화면의 바닥 지도에서 보입니다).
+				집 화면의 스카이라인은 건물 가운데 기준이라 이 그림과 값이 다를 수 있습니다.</p>
+		</section>
+
 		<h2>창문 추가</h2>
 		<form id="window-form" class="card form">
 			<div class="row">
@@ -107,6 +124,71 @@
 				svg.innerHTML = s;
 			}
 
+			// ----- 창별 스카이라인 그림 -----
+			const CAUSE = {
+				OWN: { color: '#6b7280', name: '우리 건물' }, BUILDING: { color: 'var(--accent)', name: '옆 건물' },
+				TERRAIN: { color: '#8d6e4a', name: '산·지형' }, SENSOR: { color: 'var(--warn)', name: '센서 실측' }
+			};
+			const PATH_COLOR = { WINTER_SOLSTICE: '#3b82f6', SPRING_EQUINOX: '#e0a400', SUMMER_SOLSTICE: '#e5484d' };
+			const norm180 = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+			const polar = (az, alt) => { const r = 100 * (90 - alt) / 90, t = az * Math.PI / 180; return [r * Math.sin(t), -r * Math.cos(t)]; };
+			const hm = (m) => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ' ' + (m % 60) + '분' : ''}` : `${m}분`;
+
+			/** 해 경로의 15분마다: 창에 듦(SUN) / 창 뒤쪽(BACK) / 가림 원인 */
+			function sunState(w, o, p) {
+				if (Math.abs(norm180(p.azimuth - w.azimuthDeg)) >= 90) return 'BACK';
+				const bin = o.bins[Math.min(71, Math.floor((((p.azimuth % 360) + 360) % 360) / 5))];
+				return p.altitude > bin.angle ? 'SUN' : bin.cause;
+			}
+
+			function drawSkies(room, obs, paths) {
+				const box = document.getElementById('window-skies');
+				document.getElementById('sky-section').hidden = !room.windows.length || !obs.length;
+				box.innerHTML = room.windows.map(w => {
+					const o = obs.find(x => x.windowId === w.id);
+					if (!o) return '';
+					const id = 'hatch-' + w.id;
+					let s = `<defs><pattern id="${id}" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+						<line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted)" stroke-width="1.2" opacity="0.6"/></pattern></defs>`;
+					[0, 30, 60].forEach(a => s += `<circle r="${100 * (90 - a) / 90}" fill="none" stroke="var(--line)"/>`);
+					['북', '동', '남', '서'].forEach((n, i) => { const [x, y] = polar(i * 90, -12); s += `<text x="${x}" y="${y + 4}" font-size="11" text-anchor="middle" fill="var(--muted)">${n}</text>`; });
+					// 가린 하늘 (창 앞쪽 칸만)
+					o.bins.forEach(b => {
+						if (b.angle <= 0 || !CAUSE[b.cause] || Math.abs(norm180(b.azimuth + 2.5 - w.azimuthDeg)) >= 90) return;
+						const p1 = polar(b.azimuth, 0), p2 = polar(b.azimuth + 5, 0), p3 = polar(b.azimuth + 5, b.angle), p4 = polar(b.azimuth, b.angle);
+						const tip = `${b.azimuth}°~${b.azimuth + 5}°: ${b.angle}° · ${CAUSE[b.cause].name}${b.label && b.cause !== 'TERRAIN' && b.cause !== 'SENSOR' ? ' — ' + b.label : ''}${b.distance ? (b.distance >= 1000 ? ' · ' + (b.distance / 1000).toFixed(1) + 'km' : ' · ' + b.distance + 'm') : ''}`;
+						s += `<polygon points="${[p1, p2, p3, p4].map(p => p.join(',')).join(' ')}" fill="${CAUSE[b.cause].color}" fill-opacity="0.6"><title>${escapeHtml(tip)}</title></polygon>`;
+					});
+					// 창 뒤쪽 반원 (빗금)
+					const a1 = polar(w.azimuthDeg + 90, 0), a2 = polar(w.azimuthDeg + 270, 0);
+					s += `<path d="M0 0 L${a1.join(' ')} A100 100 0 0 1 ${a2.join(' ')} Z" fill="url(#${id})" stroke="var(--line)"><title>창 뒤쪽 — 창이 붙은 벽 때문에 이쪽 해는 들어오지 않습니다</title></path>`;
+					// 해 경로
+					const lines = [];
+					paths.filter(p => PATH_COLOR[p.season]).forEach(p => {
+						const c = PATH_COLOR[p.season];
+						s += `<polyline points="${p.points.map(q => polar(q.azimuth, q.altitude).join(',')).join(' ')}" fill="none" stroke="${c}" stroke-width="1.2" opacity="0.8"/>`;
+						const count = { SUN: 0, BACK: 0 };
+						p.points.forEach(q => {
+							const st = sunState(w, o, q);
+							count[st] = (count[st] || 0) + 15;
+							const [x, y] = polar(q.azimuth, q.altitude);
+							if (q.time.endsWith(':00')) {
+								s += `<circle cx="${x}" cy="${y}" r="2.6" fill="${st === 'SUN' ? c : 'var(--surface)'}" stroke="${c}" stroke-width="1.2"><title>${p.label} ${q.time} · 고도 ${q.altitude}° · ${st === 'SUN' ? '창에 듦' : st === 'BACK' ? '창 뒤쪽' : CAUSE[st].name + '에 가림'}</title></circle>`;
+								if (['09:00', '12:00', '15:00'].includes(q.time) && p.season === 'WINTER_SOLSTICE') s += `<text x="${x + 4}" y="${y + 10}" font-size="8" fill="var(--muted)">${q.time.slice(0, 2)}시</text>`;
+							}
+						});
+						const blocked = Object.keys(CAUSE).filter(k => count[k]).map(k => `${CAUSE[k].name} ${hm(count[k])}`);
+						lines.push(`<li><b style="color:${c}">${escapeHtml(p.label)}</b> 해 드는 시간 <b>${hm(count.SUN)}</b>${count.BACK ? ` · 창 뒤쪽 ${hm(count.BACK)}` : ''}${blocked.length ? ' · 가림: ' + blocked.join(', ') : ''}</li>`);
+					});
+					// 창 방향 화살표
+					const [ax, ay] = polar(w.azimuthDeg, 0);
+					s += `<line x1="0" y1="0" x2="${ax * 0.92}" y2="${ay * 0.92}" stroke="var(--sun)" stroke-width="2.5" marker-end=""/>`;
+					return `<div class="card"><h3 style="margin-top:0">${escapeHtml(w.direction)} 창 (${w.azimuthDeg}°) · ${w.width}×${w.height}cm</h3>
+						<svg viewBox="-120 -120 240 240" style="width:100%;max-width:340px">${s}</svg>
+						<ul class="muted" style="padding-left:18px;margin:6px 0 0">${lines.join('')}</ul></div>`;
+				}).join('');
+			}
+
 			async function load() {
 				room = await api('/api/rooms/' + id);
 				document.getElementById('title').textContent = room.name;
@@ -127,6 +209,11 @@
 					return `<option value="${i}">${i}번 벽 · ${DIRS[Math.round(az / 45) % 8]}향 · ${len}cm</option>`;
 				}).join('');
 				let obs = [];
+				let paths = [];
+				try {
+					const house = await api('/api/houses/' + room.houseId);
+					paths = await api(`/api/sun/paths?lat=${house.latitude}&lon=${house.longitude}`);
+				} catch (e) { /* 해 경로 없이 그린다 */ }
 				try { obs = room.windows.length ? await api(`/api/rooms/${id}/window-obstructions`) : []; } catch (e) { /* 표만 비워 둔다 */ }
 				const obsText = (w) => {
 					const o = obs.find(x => x.windowId === w.id);
@@ -137,6 +224,7 @@
 						<td>${w.width}×${w.height}cm</td><td>${w.sillHeight}cm</td><td>${obsText(w)}</td>
 						<td><button class="small danger" data-del="${w.id}">삭제</button></td></tr>`).join('')
 					: '<tr><td colspan="6" class="muted">창문이 없습니다.</td></tr>';
+				drawSkies(room, obs, paths);
 				draw(room);
 				const img = document.getElementById('floor-plan');
 				if (room.floorPlanFileId) { img.src = `/api/files/${room.floorPlanFileId}/content?inline=true`; img.style.display = 'block'; }

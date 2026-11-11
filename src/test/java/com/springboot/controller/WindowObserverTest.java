@@ -98,6 +98,14 @@ class WindowObserverTest {
 		// 동쪽 끝 세대 남쪽 창: 남동쪽 건물이 약 7m 앞 → 70° 넘게 가림
 		double east = frontMax();
 		assertThat(east).isGreaterThan(60);
+		String bins = mvc.perform(get(room + "/window-obstructions").with(user(owner))).andReturn().getResponse()
+				.getContentAsString();
+		// 창 앞쪽(남 ±85°)에서 크게 가린 칸 (우리 벽은 창 뒤쪽 반원에만 잡힌다)
+		String front = "$[0].bins[?(@.azimuth >= 95 && @.azimuth <= 260 && @.angle > 60)]";
+		java.util.List<String> labels = JsonPath.read(bins, front + ".label");
+		assertThat(labels).isNotEmpty().allMatch(l -> l.contains("3000")); // 옆 건물 이름(지번)
+		java.util.List<String> causes = JsonPath.read(bins, front + ".cause");
+		assertThat(causes).allMatch("BUILDING"::equals);
 		String eastWinter = mvc.perform(get(room + "/sunlight").param("season", "WINTER_SOLSTICE").param("year", "2026")
 				.with(user(owner))).andReturn().getResponse().getContentAsString();
 
@@ -129,10 +137,29 @@ class WindowObserverTest {
 				.andExpect(status().isOk());
 		// 몸통 남쪽 벽(마당 쪽) 창: 양쪽 날개(20m 옆, 높이 18.75m)가 비스듬히 가린다
 		assertThat(frontMax()).isGreaterThan(30);
+		// 가린 원인은 우리 건물
+		String bins = mvc.perform(get(room + "/window-obstructions").with(user(owner))).andReturn().getResponse()
+				.getContentAsString();
+		java.util.List<String> causes = JsonPath.read(bins, "$[0].bins[?(@.angle > 20)].cause");
+		assertThat(causes).isNotEmpty().allMatch("OWN"::equals);
+		java.util.List<String> labels = JsonPath.read(bins, "$[0].bins[?(@.cause == 'OWN')].label");
+		assertThat(labels).allMatch(l -> l.startsWith("우리 건물"));
 		// 집 화면 스카이라인(건물 가운데 기준)은 지금처럼 우리 건물을 뺀다 → 가림 없음
 		String sky = mvc.perform(get(house + "/obstructions").with(user(owner))).andReturn().getResponse()
 				.getContentAsString();
 		assertThat(JsonPath.<Number>read(sky, "$[27].angle").doubleValue()).isZero(); // 135°
+	}
+
+	@Test
+	void 계절_대표일_해_경로() throws Exception {
+		String json = mvc.perform(get("/api/sun/paths").param("lat", "35.1154").param("lon", "128.9605")
+				.param("year", "2026")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		assertThat(JsonPath.<Integer>read(json, "$.length()")).isEqualTo(4);
+		java.util.List<Double> winterAlt = JsonPath.read(json, "$[?(@.season == 'WINTER_SOLSTICE')].points[*].altitude");
+		assertThat(winterAlt).allMatch(a -> a > 0);
+		assertThat(winterAlt.stream().mapToDouble(Double::doubleValue).max().orElse(0)).isBetween(30.5, 32.0); // 동지 정오 약 31.5°
+		java.util.List<Double> summerAlt = JsonPath.read(json, "$[?(@.season == 'SUMMER_SOLSTICE')].points[*].altitude");
+		assertThat(summerAlt.size()).isGreaterThan(winterAlt.size()); // 여름 낮이 길다
 	}
 
 	@Test
