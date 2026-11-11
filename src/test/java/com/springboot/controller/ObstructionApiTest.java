@@ -73,10 +73,10 @@ class ObstructionApiTest {
 		jdbc.update("update building set ground_floors = 15 where jibun = '1160-6'");
 		em.clear(); // 이미 읽어 둔 건물 엔티티 버리기
 		mvc.perform(get(house + "/obstructions").with(user(owner))).andExpect(jsonPath("$[36].angle").value(45.0));
-		// 11층: 눈 높이 31.2m → atan(20/50) = 21.8°
+		// 11층: 눈 높이 10 × 2.8 + 1.2 = 29.2m → atan(22/50) = 23.7°
 		mvc.perform(put(house).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"집\",\"floor\":11}")
 				.with(csrf()).with(user(owner))).andExpect(status().isOk());
-		mvc.perform(get(house + "/obstructions").with(user(owner))).andExpect(jsonPath("$[36].angle").value(21.8));
+		mvc.perform(get(house + "/obstructions").with(user(owner))).andExpect(jsonPath("$[36].angle").value(23.7));
 	}
 
 	@Test

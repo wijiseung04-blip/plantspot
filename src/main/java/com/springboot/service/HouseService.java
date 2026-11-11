@@ -41,7 +41,7 @@ public class HouseService {
 
 	private static final Logger log = LoggerFactory.getLogger(HouseService.class);
 
-	public static final double DEFAULT_FLOOR_HEIGHT = 3.0;
+	public static final double DEFAULT_FLOOR_HEIGHT = 2.8; // 층고(바닥~위층 바닥), 아파트 보통 2.8~2.9m
 	public static final double DEFAULT_CEILING_HEIGHT = 230;
 	/** 방 최소 넓이 1㎡ (cm²) */
 	private static final double MIN_ROOM_AREA = 10_000;

@@ -60,7 +60,7 @@ class HouseApiTest {
 				"{\"dong\":\"하단동\",\"jibun\":\"1160-6\",\"name\":\"우리 집\",\"floor\":3}", owner))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.buildingHeight").value(18.75))
-				.andExpect(jsonPath("$.floorHeight").value(3.0))
+				.andExpect(jsonPath("$.floorHeight").value(2.8))
 				.andReturn().getResponse().getHeader("Location");
 		return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
 	}

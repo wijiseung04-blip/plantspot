@@ -71,7 +71,7 @@ public class PreviewService {
 	public PreviewResult preview(PreviewRequest req) {
 		Building b = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
 		HouseService.checkFloor(b, req.floor());
-		double eye = (req.floor() - 1) * 3.0 + ObstructionService.EYE_ABOVE_FLOOR_M;
+		double eye = (req.floor() - 1) * HouseService.DEFAULT_FLOOR_HEIGHT + ObstructionService.EYE_ABOVE_FLOOR_M;
 		double azimuth = Shape.normalize(req.windowAzimuth());
 		// 창 관측점: 우리 건물 외벽(창 방향) 바로 앞
 		BuildingFacade.Observer o = BuildingFacade.observer(b.getFootprintWkt(), b.getCenterX(), b.getCenterY(),
