@@ -176,15 +176,22 @@
 	}
 
 	/** 식물 점수 — 서버 PlantScorer.score 와 같은 식 */
+	/** 서버 PlantScorer.score 와 같은 식 */
 	function plantScore(p, c) {
+		const EDGE = 0.8;
 		let light = 1;
-		if (c.lux < p.minLux) light = Math.pow(Math.max(c.lux, 1) / p.minLux, 0.7);
-		else if (c.lux > p.maxLux) light = Math.pow(p.maxLux / c.lux, 0.5);
+		if (c.lux < p.minLux) light = EDGE * Math.pow(Math.max(c.lux, 1) / p.minLux, 0.7);
+		else if (c.lux > p.maxLux) light = EDGE * Math.pow(p.maxLux / c.lux, 0.5);
+		else if (p.maxLux > p.minLux) {
+			const t = Math.log(c.lux / p.minLux) / Math.log(p.maxLux / p.minLux);
+			light = 1 - (1 - EDGE) * Math.max(0, Math.abs(t - 0.5) - 0.25) / 0.25;
+		}
 		let direct = 1;
 		if (p.minDirectMinutes > 0 && c.directMinutes < p.minDirectMinutes) direct = 0.3 + 0.7 * c.directMinutes / p.minDirectMinutes;
 		if (p.maxDirectMinutes != null && c.directMinutes > p.maxDirectMinutes) direct *= Math.pow(Math.max(p.maxDirectMinutes, 15) / c.directMinutes, 0.7);
-		const within = p.minWindowDistance == null || p.maxWindowDistance == null || (c.distance >= p.minWindowDistance && c.distance <= p.maxWindowDistance);
-		return Math.round(100 * light * direct * (within ? 1 : 0.85));
+		const gap = p.minWindowDistance == null || p.maxWindowDistance == null ? 0
+			: Math.max(0, p.minWindowDistance - c.distance, c.distance - p.maxWindowDistance);
+		return Math.round(100 * light * direct * (1 - 0.3 * Math.min(1, gap / 150)));
 	}
 
 	global.Light = { windowGeom, sunPatch, dayAt, cellCenters, plantScore, signedArea, inside, obstructionAt, norm360 };
