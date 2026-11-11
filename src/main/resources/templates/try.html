@@ -24,6 +24,7 @@
 					</select>
 				</label>
 			</div>
+			<div id="parcel-box"></div>
 			<button type="submit">예측하기</button>
 		</form>
 
@@ -66,11 +67,15 @@
 			['dong', 'jibun'].forEach(n => document.querySelector(`#form [name=${n}]`).addEventListener('input', () => {
 				buildingId = null; fillUnitPosition(unit, null, 0);
 			}));
+			const picked = (b) => { buildingId = b.buildingId; fillUnitPosition(unit, b.axis ?? null, Number(unit.value)); };
+			// 동·지번을 직접 입력해도 그 지번의 건물(동)을 고르게 한다
+			const lookup = parcelLookup(document.getElementById('dong'), document.querySelector('#form [name=jibun]'),
+				document.getElementById('parcel-box'), picked);
 			addressSearch(document.getElementById('address-box'), (b) => {
-				buildingId = b.buildingId;
-				fillUnitPosition(unit, b.axis ?? null, Number(unit.value));
+				picked(b);
 				selectDong(document.getElementById('dong'), b.dong);
 				document.querySelector('#form [name=jibun]').value = b.jibun;
+				lookup.clear();
 			});
 
 			function polar(az, alt) { const r = 100 * (90 - alt) / 90, t = az * Math.PI / 180; return [r * Math.sin(t), -r * Math.cos(t)]; }
