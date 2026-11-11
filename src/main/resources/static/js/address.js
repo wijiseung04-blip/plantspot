@@ -62,7 +62,8 @@
 		const name = (b) => b.dongLabel || b.buildingName || '';
 		const byDong = (a, b) => dongNo(a) - dongNo(b) || (!name(a) - !name(b))
 			|| name(a).localeCompare(name(b), 'ko', { numeric: true }) || b.area - a.area;
-		const label = (b) => [b.dongLabel || b.buildingName || '부속 건물(정보 없음)', b.groundFloors ? b.groundFloors + '층' : null,
+		// 이름 없는 건물: 작은 부속 시설이면 '부속 건물', 아니면 '이름 없는 건물' (사하구 건물의 상당수가 동 이름이 비어 있음)
+		const label = (b) => [b.dongLabel || b.buildingName || (isAnnex(b) ? '부속 건물(정보 없음)' : '이름 없는 건물'), b.groundFloors ? b.groundFloors + '층' : null,
 			'높이 ' + b.height + 'm', b.usage, Math.round(b.area) + '㎡'].filter(Boolean).map(escapeHtml).join(' · ');
 		// 처음 선택: 브이월드 동 이름(예: 101동)과 같은 건물 → 없으면 가장 높은 건물
 		const detail = (opts.detail || '').replace(/\s/g, '');
