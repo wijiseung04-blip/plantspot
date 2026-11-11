@@ -113,12 +113,44 @@ public class RecommendationService {
 							r.getCellX(), r.getCellY(), r.getSpotScore()))
 					.toList();
 			list.add(new PlantRecommendation(first.getRank(), p.getId(), p.getName(), p.getThumbnailUrl(),
-					p.getLightNames(), first.getSpotType(), first.getScore(), spots,
+					p.getLightNames(), p.getManageLevelCode(), p.getManageLevelName(), first.getSpotType(),
+					first.getScore(), spots,
 					first.getNotes() == null || first.getNotes().isBlank() ? List.of()
 							: List.of(first.getNotes().split("\n"))));
 		}
 		return new RecommendationView(room.getId(), room.getName(), plantService.count(), list,
 				rows.isEmpty() ? null : rows.get(0).getComputedAt().toString());
+	}
+
+	/**
+	 * 이 방에서 모든 식물의 점수와 순위 (저장하지 않음). 화면에서 관리 수준으로 거르거나 이름으로 찾아
+	 * 상위 추천에 들지 않은 식물의 점수도 볼 수 있게 한다.
+	 */
+	@Transactional
+	public RecommendationView allScores(LoginMember me, Long roomId) {
+		Room room = houseService.loadRoom(me, roomId);
+		if (room.getWindows().isEmpty()) {
+			throw new IllegalArgumentException("창문이 없는 방입니다. 창문을 먼저 등록하세요.");
+		}
+		Map<SeasonDay, List<Cell>> seasons = sunlightService.seasonCells(room, SunlightService.currentYear());
+		List<PlantResult> results = plantService.all().stream()
+				.map(p -> PlantScorer.evaluate(p, seasons, room.getWinterMinTemp()))
+				.sorted(Comparator.comparingDouble(PlantResult::score).reversed()
+						.thenComparing(r -> r.plant().getName(), Comparator.nullsLast(Comparator.naturalOrder())))
+				.toList();
+		List<PlantRecommendation> list = new ArrayList<>();
+		for (int i = 0; i < results.size(); i++) {
+			PlantResult r = results.get(i);
+			PlantSpecies p = r.plant();
+			List<SpotView> spots = r.type() == SpotType.FIXED
+					? List.of(new SpotView(null, "1년 내내", r.fixed().cell().x(), r.fixed().cell().y(), r.fixed().score()))
+					: r.seasonal().values().stream()
+							.map(s -> new SpotView(s.season(), s.season().getLabel(), s.cell().x(), s.cell().y(), s.score()))
+							.toList();
+			list.add(new PlantRecommendation(i + 1, p.getId(), p.getName(), p.getThumbnailUrl(), p.getLightNames(),
+					p.getManageLevelCode(), p.getManageLevelName(), r.type(), r.score(), spots, r.notes()));
+		}
+		return new RecommendationView(room.getId(), room.getName(), list.size(), list, null);
 	}
 
 	/** 한 식물의 계절별 칸 점수 (적합도 지도). */
@@ -174,8 +206,9 @@ public class RecommendationService {
 	public record SpotView(SeasonDay season, String label, double x, double y, double score) {
 	}
 
+	/** manageLevelCode: 농사로 관리 수준 (089001 초보자 / 089002 경험자 / 089003 전문가, 없으면 null) */
 	public record PlantRecommendation(int rank, Long plantId, String name, String thumbnailUrl, String lightNames,
-			SpotType type, double score, List<SpotView> spots, List<String> notes) {
+			String manageLevelCode, String manageLevelName, SpotType type, double score, List<SpotView> spots, List<String> notes) {
 	}
 
 	public record RecommendationView(Long roomId, String roomName, long plantCount, List<PlantRecommendation> items,
