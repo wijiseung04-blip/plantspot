@@ -39,6 +39,9 @@ class ObstructionApiTest {
 	@Autowired
 	JdbcTemplate jdbc;
 
+	@jakarta.persistence.PersistenceContext
+	jakarta.persistence.EntityManager em;
+
 	LoginMember owner;
 	String house;
 
@@ -67,6 +70,8 @@ class ObstructionApiTest {
 
 	@Test
 	void 층을_올리면_가림_각도가_낮아진다() throws Exception {
+		jdbc.update("update building set ground_floors = 15 where jibun = '1160-6'");
+		em.clear(); // 이미 읽어 둔 건물 엔티티 버리기
 		mvc.perform(get(house + "/obstructions").with(user(owner))).andExpect(jsonPath("$[36].angle").value(45.0));
 		// 11층: 눈 높이 31.2m → atan(20/50) = 21.8°
 		mvc.perform(put(house).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"집\",\"floor\":11}")
