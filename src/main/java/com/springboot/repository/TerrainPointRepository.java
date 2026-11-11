@@ -16,5 +16,4 @@ public interface TerrainPointRepository extends JpaRepository<TerrainPoint, Long
 
 	long countByGridId(Long gridId);
 
-	List<TerrainPoint> findByGridId(Long gridId);
 }

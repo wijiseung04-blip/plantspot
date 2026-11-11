@@ -58,9 +58,8 @@
 			status().catch(show);
 			api('/api/admin/terrain/status').then(t => {
 				document.getElementById('terrain').innerHTML = t.available
-					? `지형(땅 높이) ${t.points.toLocaleString()} / ${t.total.toLocaleString()}점 · ${t.spacing}m 간격 · ${escapeHtml(t.source || '')}`
-						+ (t.completedAt ? '' : ' · <b>덜 받음</b> (importTerrain 을 다시 실행하면 이어서 받음)')
-					: '지형(땅 높이) 자료 <b>없음</b> — 서버를 끄고 <code>./gradlew importTerrain</code> 실행 (없으면 평지로 계산)';
+					? `지형(땅 높이) ${t.points.toLocaleString()}점 · ${t.spacing}m 간격 · 파일 ${escapeHtml(t.source || '')}`
+					: '지형(땅 높이) 자료 <b>없음</b> — 서버를 끄고 <code>./gradlew importTerrain -Pdem=파일.asc</code> 실행 (없으면 평지로 계산)';
 			}).catch(show);
 
 			document.getElementById('collect').addEventListener('submit', async (ev) => {

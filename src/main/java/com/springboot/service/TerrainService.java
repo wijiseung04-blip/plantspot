@@ -1,83 +1,78 @@
 package com.springboot.service;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.springboot.calculator.TerrainModel;
-import com.springboot.calculator.TmConverter;
-import com.springboot.calculator.TmConverter.LatLon;
-import com.springboot.client.ElevationApi;
 import com.springboot.domain.TerrainGrid;
-import com.springboot.domain.TerrainPoint;
 import com.springboot.repository.BuildingRepository;
 import com.springboot.repository.TerrainGridRepository;
 import com.springboot.repository.TerrainPointRepository;
+import com.springboot.tool.AscGridReader;
 
 /**
- * 지형(땅 높이) 격자 가져오기와 조회. [① 공개 데이터 → DB 전환]
- * 건물 데이터 범위 + 여유(기본 5km)를 격자 간격(기본 90m = 자료 해상도)으로 나눠 점마다 고도 API로 높이를 받아 저장한다.
- * 중간에 멈춰도(사용량 제한 등) 다시 실행하면 받은 점은 건너뛰고 이어서 받는다.
+ * 지형(땅 높이) 격자 가져오기와 조회. [① 공개 데이터 → DB 전환: 수치표고모델(DEM) 파일 → terrain_grid·terrain_point]
+ * QGIS 에서 EPSG:5186 으로 바꿔 ASCII Grid(.asc)로 저장한 파일을 읽어, 건물 데이터 범위 + 여유(기본 5km)만 잘라 저장한다.
+ * 점이 너무 많으면(기본 150만 점 초과) 몇 칸씩 건너뛰어 줄인다.
  */
 @Service
 public class TerrainService {
 
 	private static final Logger log = LoggerFactory.getLogger(TerrainService.class);
-	private static final int MAX_POINTS = 200_000;
+	private static final int BATCH = 5000;
 
 	private final TerrainGridRepository grids;
 	private final TerrainPointRepository points;
 	private final BuildingRepository buildings;
-	private final ElevationApi api;
-	private final double spacing;
+	private final JdbcTemplate jdbc;
 	private final double buffer;
-	private final long delayMs;
+	private final int maxPoints;
 
 	/** 읽어 둔 격자 (가져오기가 끝나면 비운다) */
-	private volatile Loaded loaded;
-
-	private record Loaded(Long gridId, TerrainModel model) {
-	}
+	private volatile TerrainModel loaded;
 
 	public TerrainService(TerrainGridRepository grids, TerrainPointRepository points, BuildingRepository buildings,
-			ElevationApi api, @Value("${plantspot.terrain.spacing:90}") double spacing,
-			@Value("${plantspot.terrain.buffer:5000}") double buffer,
-			@Value("${plantspot.terrain.delay-ms:300}") long delayMs) {
+			JdbcTemplate jdbc, @Value("${plantspot.terrain.buffer:5000}") double buffer,
+			@Value("${plantspot.terrain.max-points:1500000}") int maxPoints) {
 		this.grids = grids;
 		this.points = points;
 		this.buildings = buildings;
-		this.api = api;
-		this.spacing = spacing;
+		this.jdbc = jdbc;
 		this.buffer = buffer;
-		this.delayMs = delayMs;
+		this.maxPoints = maxPoints;
 	}
 
 	/** 지형 자료가 있으면 격자, 없으면 null. */
 	public TerrainModel model() {
-		Loaded l = loaded;
-		if (l != null) {
-			return l.model();
+		TerrainModel m = loaded;
+		if (m != null) {
+			return m;
 		}
 		TerrainGrid g = grids.findTopByOrderByIdDesc().orElse(null);
 		if (g == null) {
 			return null;
 		}
-		TerrainModel m = new TerrainModel(g.getOriginX(), g.getOriginY(), g.getSpacing(), g.getNx(), g.getNy());
 		List<Object[]> rows = points.findValues(g.getId());
 		if (rows.isEmpty()) {
 			return null;
 		}
+		m = new TerrainModel(g.getOriginX(), g.getOriginY(), g.getSpacing(), g.getNx(), g.getNy());
 		for (Object[] r : rows) {
 			m.set(((Number) r[0]).intValue(), ((Number) r[1]).intValue(), ((Number) r[2]).doubleValue());
 		}
-		loaded = new Loaded(g.getId(), m);
+		loaded = m;
 		log.info("지형 격자 {}점 읽음 ({}m 간격)", rows.size(), g.getSpacing());
 		return m;
 	}
@@ -88,96 +83,108 @@ public class TerrainService {
 		return m == null ? Double.NaN : m.elevationAt(x, y);
 	}
 
-	public record Progress(int done, int total) {
-	}
-
-	public record ImportResult(int total, int fetched, int skipped, double minElevation, double maxElevation) {
+	public record ImportResult(String file, int points, int nx, int ny, double spacing, int step, double minElevation,
+			double maxElevation) {
 
 		public String summary() {
-			return String.format("지형 격자 %d점 중 새로 %d점 받음, 이미 있던 %d점 건너뜀 (높이 %.0f~%.0fm)", total, fetched,
-					skipped, minElevation, maxElevation);
+			return String.format("지형 %,d점 저장 (%d×%d, %.0fm 간격%s) · 높이 %.0f~%.0fm · %s", points, nx, ny, spacing,
+					step > 1 ? ", 원본 " + step + "칸마다 1칸" : "", minElevation, maxElevation, file);
 		}
 	}
 
-	/** 건물 데이터 범위 + 여유를 덮는 격자를 받아 저장한다. */
-	public ImportResult importAll(Consumer<Progress> progress) {
+	/** DEM ASCII Grid 파일을 읽어 이전 지형 자료를 바꾼다. */
+	@Transactional
+	public ImportResult importFile(Path file, Consumer<String> progress) {
+		if (!Files.isRegularFile(file)) {
+			throw new IllegalArgumentException("DEM 파일이 없습니다: " + file.toAbsolutePath());
+		}
 		List<Object[]> ext = buildings.findExtent();
 		if (ext.isEmpty() || ext.get(0)[0] == null) {
 			throw new IllegalStateException("건물 데이터가 없습니다. 먼저 importBuildings 로 건물을 가져오세요.");
 		}
 		Object[] e = ext.get(0);
-		double minX = Math.floor((((Number) e[0]).doubleValue() - buffer) / spacing) * spacing;
+		double minX = ((Number) e[0]).doubleValue() - buffer;
 		double maxX = ((Number) e[1]).doubleValue() + buffer;
-		double minY = Math.floor((((Number) e[2]).doubleValue() - buffer) / spacing) * spacing;
+		double minY = ((Number) e[2]).doubleValue() - buffer;
 		double maxY = ((Number) e[3]).doubleValue() + buffer;
-		int nx = (int) Math.ceil((maxX - minX) / spacing) + 1;
-		int ny = (int) Math.ceil((maxY - minY) / spacing) + 1;
-		int total = nx * ny;
-		if (total > MAX_POINTS) {
-			throw new IllegalStateException("격자 점이 너무 많습니다 (" + total + "점). plantspot.terrain.spacing 을 늘리세요.");
-		}
+		try {
+			AscGridReader.Header h = AscGridReader.header(file);
+			// 건물 범위 + 여유에 드는 열·행
+			int c0 = Math.max(0, (int) Math.floor((minX - h.x(0)) / h.cellsize()));
+			int c1 = Math.min(h.ncols() - 1, (int) Math.ceil((maxX - h.x(0)) / h.cellsize()));
+			int rTop = Math.max(0, (int) Math.floor((h.y(0) - maxY) / h.cellsize()));
+			int rBottom = Math.min(h.nrows() - 1, (int) Math.ceil((h.y(0) - minY) / h.cellsize()));
+			if (c0 > c1 || rTop > rBottom) {
+				throw new IllegalStateException(String.format(
+						"DEM 파일 범위(x %.0f~%.0f, y %.0f~%.0f)가 건물 데이터 범위와 겹치지 않습니다. "
+								+ "QGIS 에서 좌표계를 EPSG:5186 으로 바꿔 저장했는지 확인하세요.",
+						h.x(0), h.x(h.ncols() - 1), h.y(h.nrows() - 1), h.y(0)));
+			}
+			long cells = (long) (c1 - c0 + 1) * (rBottom - rTop + 1);
+			int step = (int) Math.max(1, Math.ceil(Math.sqrt((double) cells / maxPoints)));
+			int nx = (c1 - c0) / step + 1;
+			int ny = (rBottom - rTop) / step + 1;
+			double spacing = h.cellsize() * step;
+			int bottomRow = rTop + (ny - 1) * step;
+			progress.accept(String.format("원본 %d×%d (%.1fm) 중 %d×%d 를 %.0fm 간격으로 저장", h.ncols(), h.nrows(),
+					h.cellsize(), nx, ny, spacing));
 
-		TerrainGrid grid = grids.findTopByOrderByIdDesc().orElse(null);
-		if (grid == null || !grid.sameShape(minX, minY, spacing, nx, ny)) {
-			if (grid != null) {
-				log.info("건물 범위가 바뀌어 지형 격자를 새로 만듭니다");
-				for (TerrainGrid old : grids.findAll()) {
-					points.deleteAll(points.findByGridId(old.getId()));
-					grids.delete(old);
+			// 이전 자료 지우기 (점은 엔티티로 읽지 않으므로 한 번에 지워도 된다)
+			jdbc.update("delete from terrain_point");
+			grids.deleteAll(grids.findAll());
+			grids.flush();
+			TerrainGrid grid = grids.saveAndFlush(new TerrainGrid(h.x(c0), h.y(bottomRow), spacing, nx, ny,
+					file.getFileName().toString()));
+			loaded = null;
+
+			List<Object[]> batch = new ArrayList<>(BATCH);
+			double[] stats = { Double.MAX_VALUE, -Double.MAX_VALUE, 0 };
+			AscGridReader.read(file, (row, values) -> {
+				if (row > bottomRow) {
+					return false;
 				}
-			}
-			grid = grids.save(new TerrainGrid(minX, minY, spacing, nx, ny, api.sourceName()));
-		}
-		loaded = null;
-
-		Set<Long> have = new HashSet<>();
-		for (Object[] r : points.findValues(grid.getId())) {
-			have.add(key(((Number) r[0]).intValue(), ((Number) r[1]).intValue()));
-		}
-		int skipped = have.size();
-		log.info("지형 격자 {}×{} = {}점 ({}m 간격), 이미 {}점 있음", nx, ny, total, spacing, skipped);
-
-		List<int[]> todo = new ArrayList<>();
-		for (int iy = 0; iy < ny; iy++) {
-			for (int ix = 0; ix < nx; ix++) {
-				if (!have.contains(key(ix, iy))) {
-					todo.add(new int[] { ix, iy });
+				if (row < rTop || (row - rTop) % step != 0) {
+					return true;
 				}
+				int iy = (bottomRow - row) / step;
+				for (int c = c0, ix = 0; ix < nx; c += step, ix++) {
+					double v = values[c];
+					if (h.isNoData(v)) {
+						continue;
+					}
+					batch.add(new Object[] { grid.getId(), ix, iy, v });
+					stats[0] = Math.min(stats[0], v);
+					stats[1] = Math.max(stats[1], v);
+					stats[2]++;
+					if (batch.size() == BATCH) {
+						flush(batch);
+					}
+				}
+				if (iy % 100 == 0) {
+					progress.accept(String.format("  %,d점", (long) stats[2]));
+				}
+				return true;
+			});
+			flush(batch);
+			grid.complete();
+			grids.save(grid);
+			loaded = null;
+			if (stats[2] == 0) {
+				throw new IllegalStateException("DEM 파일에서 값이 있는 점을 하나도 찾지 못했습니다.");
 			}
+			log.info("지형 가져오기: {} → {}점", file.getFileName(), (long) stats[2]);
+			return new ImportResult(file.getFileName().toString(), (int) stats[2], nx, ny, spacing, step, stats[0],
+					stats[1]);
+		} catch (IOException ex) {
+			throw new UncheckedIOException("DEM 파일을 읽을 수 없습니다: " + ex.getMessage(), ex);
 		}
-		int fetched = 0;
-		for (int from = 0; from < todo.size(); from += api.maxBatch()) {
-			List<int[]> batch = todo.subList(from, Math.min(todo.size(), from + api.maxBatch()));
-			List<LatLon> ll = new ArrayList<>();
-			for (int[] p : batch) {
-				ll.add(TmConverter.toLatLon(minX + p[0] * spacing, minY + p[1] * spacing));
-			}
-			double[] z = api.elevations(ll);
-			List<TerrainPoint> rows = new ArrayList<>();
-			for (int i = 0; i < batch.size(); i++) {
-				rows.add(new TerrainPoint(grid, batch.get(i)[0], batch.get(i)[1], z[i]));
-			}
-			points.saveAll(rows);
-			fetched += batch.size();
-			progress.accept(new Progress(skipped + fetched, total));
-			if (delayMs > 0 && from + api.maxBatch() < todo.size()) {
-				sleep(delayMs);
-			}
-		}
-		grid.complete();
-		grids.save(grid);
-		loaded = null;
+	}
 
-		TerrainModel m = model();
-		double lo = Double.MAX_VALUE;
-		double hi = -Double.MAX_VALUE;
-		for (Object[] r : points.findValues(grid.getId())) {
-			double v = ((Number) r[2]).doubleValue();
-			lo = Math.min(lo, v);
-			hi = Math.max(hi, v);
+	private void flush(List<Object[]> batch) {
+		if (!batch.isEmpty()) {
+			jdbc.batchUpdate("insert into terrain_point (grid_id, ix, iy, elevation) values (?, ?, ?, ?)", batch);
+			batch.clear();
 		}
-		log.info("지형 가져오기 끝: {}", m != null ? "사용 가능" : "자료 없음");
-		return new ImportResult(total, fetched, skipped, lo, hi);
 	}
 
 	/** 지형 자료 상태 (관리자 화면). */
@@ -187,22 +194,10 @@ public class TerrainService {
 	public Status status() {
 		TerrainGrid g = grids.findTopByOrderByIdDesc().orElse(null);
 		if (g == null) {
-			return new Status(false, 0, 0, spacing, null, null);
+			return new Status(false, 0, 0, 0, null, null);
 		}
 		long n = points.countByGridId(g.getId());
 		return new Status(n > 0, n, g.getNx() * g.getNy(), g.getSpacing(), g.getSource(),
 				g.getCompletedAt() != null ? g.getCompletedAt().toString() : null);
-	}
-
-	private static long key(int ix, int iy) {
-		return ((long) ix << 32) | (iy & 0xffffffffL);
-	}
-
-	private static void sleep(long ms) {
-		try {
-			Thread.sleep(ms);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
 	}
 }
