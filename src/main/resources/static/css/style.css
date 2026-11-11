@@ -70,3 +70,9 @@ th { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); }
 .badge.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
 button:disabled, .button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 식물 상세 팝업 (식물 추천 화면) */
+dialog.popup { border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--surface); color: var(--text); }
+dialog.popup::backdrop { background: rgba(0, 0, 0, 0.45); }
+dialog.popup .popup-body { padding: 20px; overflow-y: auto; max-height: calc(100vh - 120px); }
+dialog.popup .popup-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid var(--line); }

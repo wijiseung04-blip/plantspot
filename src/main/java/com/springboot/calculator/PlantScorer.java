@@ -147,7 +147,6 @@ public final class PlantScorer {
 			notes.add("한 자리에서는 1년 내내 맞지 않아 계절마다 자리를 옮기는 것이 좋습니다.");
 		}
 		score = Math.round((score * 0.9 + share * 10) * 10) / 10.0;
-		notes.add(String.format("1년 내내 잘 맞는(%d점 이상) 자리가 방의 %d%%입니다.", ROOMY_THRESHOLD, Math.round(share * 100)));
 		if (p.getWinterMinTemp() != null && roomWinterMinTemp != null && roomWinterMinTemp < p.getWinterMinTemp()) {
 			notes.add(String.format("겨울 실내 최저 %.1f℃가 이 식물의 겨울 최저온도 %d℃보다 낮습니다. 창가에서 떨어뜨리거나 보온하세요.",
 					roomWinterMinTemp, p.getWinterMinTemp()));

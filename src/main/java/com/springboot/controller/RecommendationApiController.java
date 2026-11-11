@@ -59,6 +59,12 @@ public class RecommendationApiController {
 		return recommendations.refresh(me, id, limit);
 	}
 
+	/** 이 방에서 모든 식물의 점수·순위 (관리 수준 거르기, 이름 찾기용) */
+	@GetMapping("/api/rooms/{id}/plant-scores")
+	public RecommendationView allScores(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
+		return recommendations.allScores(me, id);
+	}
+
 	/** 한 식물의 계절별 칸 점수(적합도 지도) */
 	@GetMapping("/api/rooms/{id}/recommendations/{plantId}")
 	public PlantFit fit(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id, @PathVariable("plantId") Long plantId) {

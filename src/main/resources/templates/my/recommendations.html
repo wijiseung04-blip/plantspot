@@ -12,7 +12,17 @@
 			<button type="button" id="refresh" class="small secondary">다시 계산</button></p>
 		<div class="row">
 			<div style="flex:1 1 320px">
+				<nav class="tabs" id="levels">
+					<a href="#" data-level="" class="active">전체</a>
+					<a href="#" data-level="089001">초보자</a>
+					<a href="#" data-level="089002">경험자</a>
+					<a href="#" data-level="089003">전문가</a>
+				</nav>
+				<label class="muted" style="display:block;margin-bottom:8px">식물 이름으로 찾기
+					<input id="keyword" type="search" placeholder="예: 몬스테라" autocomplete="off"></label>
+				<p id="list-info" class="muted"></p>
 				<div id="list"></div>
+				<p><button type="button" id="more" class="small secondary" style="display:none">더 보기</button></p>
 			</div>
 			<div class="card" style="flex:1 1 380px">
 				<h2 id="fit-title" style="margin-top:0">식물을 고르면 칸별 적합도를 보여줍니다</h2>
@@ -26,23 +36,53 @@
 			</div>
 		</div>
 	</main>
+
+	<!-- 식물을 고르면 뜨는 상세 정보 팝업 -->
+	<dialog id="plant-popup" class="popup">
+		<div class="popup-body" id="popup-body"></div>
+		<div class="popup-foot">
+			<a id="popup-link" class="small secondary" href="#">상세 페이지</a>
+			<button type="button" id="popup-close" class="small">닫고 칸별 적합도 보기</button>
+		</div>
+	</dialog>
 	<script th:inline="none">
 		document.addEventListener('DOMContentLoaded', () => {
 			const id = document.body.dataset.roomId;
 			const msg = document.getElementById('msg');
 			const show = (e) => { msg.textContent = e.message; msg.hidden = false; };
 			let room = null, data = null, fit = null, selected = null, season = 'WINTER_SOLSTICE';
+			let level = '', keyword = '', shown = 10;
+			const PAGE = 10;
+
+			/** 관리 수준·이름으로 거른 목록 (순위는 이 방의 전체 순위 그대로) */
+			function filtered() {
+				const k = keyword.trim().replace(/\s/g, '');
+				return data.items.filter(p => (!level || (p.manageLevelCode || '').split(',').map(c => c.trim()).includes(level))
+					&& (!k || (p.name || '').replace(/\s/g, '').includes(k)));
+			}
 
 			function renderList() {
-				document.getElementById('list').innerHTML = data.items.length ? data.items.map(p => `
+				const all = filtered();
+				const items = keyword.trim() ? all : all.slice(0, shown);
+				const levelName = document.querySelector(`#levels a[data-level="${level}"]`).textContent;
+				document.getElementById('list-info').textContent = !data.items.length ? ''
+					: keyword.trim() ? `"${keyword.trim()}" 검색 결과 ${all.length}종 (전체 ${data.items.length}종 중 순위)`
+					: `${level ? levelName + ' 식물 ' + all.length + '종 중 ' : '전체 ' + all.length + '종 중 '}상위 ${items.length}종`;
+				document.getElementById('more').style.display = keyword.trim() || items.length >= all.length ? 'none' : ''; // button 의 display 가 hidden 속성을 덮어씀
+				document.getElementById('list').innerHTML = !data.items.length
+					? `<p class="muted">식물 정보가 없습니다. 관리자가 농사로 데이터를 가져오면 추천합니다.</p>`
+					: !items.length ? `<p class="muted">조건에 맞는 식물이 없습니다.</p>`
+					: items.map(p => `
 					<div class="card" data-plant="${p.plantId}" style="cursor:pointer;display:flex;gap:12px;${selected === p.plantId ? 'outline:2px solid var(--accent)' : ''}">
 						${p.thumbnailUrl ? `<img src="${escapeHtml(p.thumbnailUrl)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">` : ''}
-						<div><strong>${p.rank}. ${escapeHtml(p.name)}</strong> <span class="badge">${Math.round(p.score)}점</span>
+						<div><strong>${p.rank}위. ${escapeHtml(p.name)}</strong> <span class="badge">${Math.round(p.score)}점</span>
 							<span class="badge ${p.type === 'FIXED' ? '' : 'warn'}">${p.type === 'FIXED' ? '고정 자리' : '계절 이동'}</span>
+							${p.manageLevelName ? `<span class="badge">${escapeHtml(p.manageLevelName)}</span>` : ''}
+							${p.roomyPercent != null ? `<div class="muted" title="1년 내내 80점 이상인 칸의 비율">잘 맞는 자리: 방의 ${p.roomyPercent}%</div>` : ''}
 							<div class="muted">${p.spots.map(s => `${s.label}: (${Math.round(s.x)}, ${Math.round(s.y)})cm ${Math.round(s.score)}점`).join(' · ')}</div>
 							${p.notes.map(n => `<div class="muted">⚠ ${escapeHtml(n)}</div>`).join('')}
 						</div>
-					</div>`).join('') : `<p class="muted">식물 정보가 없습니다 (${data.plantCount}종). 관리자가 농사로 데이터를 가져오면 추천합니다.</p>`;
+					</div>`).join('');
 			}
 
 			function renderFit() {
@@ -55,15 +95,15 @@
 					tip: (c) => `${Math.round(c.score)}점${c.withinPlacement ? '' : ' (농사로 배치 거리 밖)'}`,
 					marks: spots.map(s => ({ x: s.x, y: s.y, label: '추천 자리', text: '★', color: 'var(--accent)' }))
 				});
-				document.getElementById('fit-title').textContent = `${fit.name} · ${Math.round(fit.score)}점`;
+				document.getElementById('fit-title').textContent = `${fit.name} · ${Math.round(fit.score)}점 · 잘 맞는 자리 ${fit.roomyPercent}%`;
 				document.getElementById('fit-notes').innerHTML = fit.notes.map(n => `<p class="muted">⚠ ${escapeHtml(n)}</p>`).join('');
 			}
 
 			async function load(refresh) {
 				room = room || await api('/api/rooms/' + id);
 				document.getElementById('title').textContent = room.name + ' · 식물 추천';
-				data = refresh ? await api(`/api/rooms/${id}/recommendations/refresh`, { method: 'POST' })
-					: await api(`/api/rooms/${id}/recommendations`);
+				if (refresh) await api(`/api/rooms/${id}/recommendations/refresh`, { method: 'POST' });
+				data = await api(`/api/rooms/${id}/plant-scores`);
 				renderList();
 				if (!selected && data.items.length) await select(data.items[0].plantId); else renderFit();
 			}
@@ -72,12 +112,66 @@
 				fit = await api(`/api/rooms/${id}/recommendations/${plantId}`);
 				renderList(); renderFit();
 			}
+
+			// ----- 상세 정보 팝업 -----
+			const popup = document.getElementById('plant-popup');
+			async function openPopup(plantId) {
+				const rec = data.items.find(p => p.plantId === plantId);
+				const body = document.getElementById('popup-body');
+				body.innerHTML = '<p class="muted">불러오는 중…</p>';
+				document.getElementById('popup-link').href = '/plants/' + plantId;
+				if (typeof popup.showModal === 'function') popup.showModal(); else popup.setAttribute('open', '');
+				try {
+					const p = await api('/api/plants/' + plantId);
+					const e = escapeHtml, v = (x) => x ? e(x) : '-';
+					const water = [['봄', p.waterSpring], ['여름', p.waterSummer], ['가을', p.waterAutumn], ['겨울', p.waterWinter]]
+						.filter(w => w[1]).map(w => `${w[0]} ${e(w[1])}`).join('<br>') || '-';
+					body.innerHTML = `
+						<div style="display:flex;gap:16px;flex-wrap:wrap">
+							${p.imageUrl || p.thumbnailUrl ? `<img src="${e(p.imageUrl || p.thumbnailUrl)}" alt="" style="width:160px;max-width:100%;border-radius:10px;object-fit:cover">` : ''}
+							<div style="flex:1 1 240px">
+								<h2 style="margin-top:0">${e(p.name)}</h2>
+								${p.scientificName ? `<p class="muted"><i>${e(p.scientificName)}</i>${p.familyName ? ' · ' + e(p.familyName) : ''}</p>` : ''}
+								${rec ? `<p><span class="badge">이 방 ${Math.round(rec.score)}점 · 전체 ${data.items.length}종 중 ${rec.rank}위</span>
+									<span class="badge ${rec.type === 'FIXED' ? '' : 'warn'}">${rec.type === 'FIXED' ? '고정 자리' : '계절 이동'}</span></p>
+									${rec.roomyPercent != null ? `<p class="muted">1년 내내 잘 맞는(80점 이상) 자리가 방의 ${rec.roomyPercent}%입니다.</p>` : ''}` : ''}
+							</div>
+						</div>
+						<div class="table-wrap"><table>
+							<tr><th>빛 요구(농사로)</th><td>${v(p.lightNames)}</td></tr>
+							<tr><th>추천 배치(농사로)</th><td>${v(p.placementNames)}</td></tr>
+							<tr><th>관리 수준</th><td>${v(p.manageLevelName)}</td></tr>
+							<tr><th>겨울 최저온도</th><td>${v(p.winterMinName)}</td></tr>
+							<tr><th>생육 온도</th><td>${v(p.growthTempName)}</td></tr>
+							<tr><th>습도</th><td>${v(p.humidityName)}</td></tr>
+							<tr><th>물주기</th><td>${water}</td></tr>
+							<tr><th>추천 기준(변환값)</th><td>${p.minLux.toLocaleString()} ~ ${p.maxLux.toLocaleString()} lux${p.minWindowDistance != null ? ` · 창에서 ${p.minWindowDistance} ~ ${p.maxWindowDistance}cm` : ''}</td></tr>
+						</table></div>
+						${rec && rec.notes.length ? rec.notes.map(n => `<p class="muted">⚠ ${e(n)}</p>`).join('') : ''}
+						${p.advice ? `<h3>관리 요령</h3><p>${e(p.advice)}</p>` : ''}`;
+				} catch (err) { body.innerHTML = `<p class="flash err">${escapeHtml(err.message)}</p>`; }
+			}
+			function closePopup() { if (typeof popup.close === 'function') popup.close(); else popup.removeAttribute('open'); }
+			document.getElementById('popup-close').addEventListener('click', closePopup);
+			popup.addEventListener('click', (ev) => { if (ev.target === popup) closePopup(); }); // 바깥 누르면 닫기
+
 			load(false).catch(show);
 
 			document.getElementById('list').addEventListener('click', (ev) => {
 				const card = ev.target.closest('[data-plant]');
-				if (card) select(Number(card.dataset.plant)).catch(show);
+				if (!card) return;
+				const plantId = Number(card.dataset.plant);
+				openPopup(plantId);
+				select(plantId).catch(show);
 			});
+			document.getElementById('levels').addEventListener('click', (ev) => {
+				if (ev.target.tagName !== 'A') return;
+				ev.preventDefault();
+				document.querySelectorAll('#levels a').forEach(a => a.classList.toggle('active', a === ev.target));
+				level = ev.target.dataset.level; shown = PAGE; renderList();
+			});
+			document.getElementById('keyword').addEventListener('input', (ev) => { keyword = ev.target.value; renderList(); });
+			document.getElementById('more').addEventListener('click', () => { shown += PAGE; renderList(); });
 			document.getElementById('seasons').addEventListener('click', (ev) => {
 				if (ev.target.tagName !== 'A') return;
 				ev.preventDefault();

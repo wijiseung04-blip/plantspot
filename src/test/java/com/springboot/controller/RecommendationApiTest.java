@@ -63,6 +63,9 @@ class RecommendationApiTest {
 	@Autowired
 	JdbcTemplate jdbc;
 
+	@jakarta.persistence.PersistenceContext
+	jakarta.persistence.EntityManager em;
+
 	LoginMember owner;
 	LoginMember other;
 	String room;
@@ -132,6 +135,23 @@ class RecommendationApiTest {
 		java.util.List<Integer> v = JsonPath.read(sunlightJson,
 				"$.cells[?(@.x==" + x.doubleValue() + " && @.y==" + y.doubleValue() + ")].directMinutes");
 		return v.get(0);
+	}
+
+	@Test
+	void 모든_식물_점수와_관리_수준() throws Exception {
+		jdbc.update("update plant_species set manage_level_code = '089001', manage_level_name = '초보자' where id = ?",
+				shadePlant);
+		em.clear(); // JPA 로 저장해 둔 식물 엔티티 버리기
+		mvc.perform(get(room + "/plant-scores").with(user(owner)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items.length()").value(3))
+				.andExpect(jsonPath("$.items[0].rank").value(1))
+				.andExpect(jsonPath("$.items[2].name").value("불가능식물"))
+				.andExpect(jsonPath("$.items[?(@.name == '음지식물')].manageLevelCode").value("089001"))
+				.andExpect(jsonPath("$.items[?(@.name == '음지식물')].manageLevelName").value("초보자"))
+				.andExpect(jsonPath("$.items[0].spots.length()", org.hamcrest.Matchers.greaterThan(0)));
+		// 남의 방은 볼 수 없다
+		mvc.perform(get(room + "/plant-scores").with(user(other))).andExpect(status().isForbidden());
 	}
 
 	@Test
