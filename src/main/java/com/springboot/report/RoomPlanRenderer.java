@@ -63,6 +63,13 @@ public final class RoomPlanRenderer {
 
 	public static BufferedImage render(List<Point> polygon, double orientationDeg, List<WindowGeom> windows,
 			List<Cell> cells, double cellSize, Function<Cell, Color> color, List<Mark> marks, int sizePx) {
+		return render(polygon, orientationDeg, windows, null, cells, cellSize, color, marks, sizePx);
+	}
+
+	/** innerGlass: 안쪽 창 선(발코니 + 거실), 있으면 파란 점선으로 그린다. */
+	public static BufferedImage render(List<Point> polygon, double orientationDeg, List<WindowGeom> windows,
+			com.springboot.calculator.SunlightCalculator.InnerGlass innerGlass, List<Cell> cells, double cellSize,
+			Function<Cell, Color> color, List<Mark> marks, int sizePx) {
 		double minX = polygon.stream().mapToDouble(Point::x).min().orElse(0);
 		double maxX = polygon.stream().mapToDouble(Point::x).max().orElse(1);
 		double minY = polygon.stream().mapToDouble(Point::y).min().orElse(0);
@@ -117,6 +124,13 @@ public final class RoomPlanRenderer {
 			g.draw(new Line2D.Double(wg.startX(), wg.startY(), wg.startX() + wg.alongX() * wg.width(),
 					wg.startY() + wg.alongY() * wg.width()));
 		}
+		double[] line = innerGlassLine(polygon, innerGlass);
+		if (line != null) {
+			float dash = (float) (12 / scale);
+			g.setStroke(new BasicStroke((float) (4 / scale), BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10,
+					new float[] { dash, dash * 0.6f }, 0));
+			g.draw(new Line2D.Double(line[0], line[1], line[2], line[3]));
+		}
 		double r = cellSize * 0.45;
 		for (Mark m : marks) {
 			g.setColor(m.color());
@@ -145,6 +159,33 @@ public final class RoomPlanRenderer {
 		g.fill(head);
 		g.dispose();
 		return img;
+	}
+
+	/** 안쪽 창 선 두 점 {x1, y1, x2, y2}: 벽과 나란히 방 안쪽으로 distance. 없으면 null. */
+	static double[] innerGlassLine(List<Point> polygon,
+			com.springboot.calculator.SunlightCalculator.InnerGlass g) {
+		if (g == null || g.wallIndex() < 0 || g.wallIndex() >= polygon.size()) {
+			return null;
+		}
+		Point a = polygon.get(g.wallIndex());
+		Point b = polygon.get((g.wallIndex() + 1) % polygon.size());
+		double len = Math.hypot(b.x() - a.x(), b.y() - a.y());
+		if (len == 0) {
+			return null;
+		}
+		double area = 0;
+		for (int i = 0; i < polygon.size(); i++) {
+			Point p = polygon.get(i);
+			Point q = polygon.get((i + 1) % polygon.size());
+			area += p.x() * q.y() - q.x() * p.y();
+		}
+		double ux = (b.x() - a.x()) / len;
+		double uy = (b.y() - a.y()) / len;
+		double sg = area > 0 ? 1 : -1;
+		double nx = -uy * sg; // 방 안쪽
+		double ny = ux * sg;
+		return new double[] { a.x() + nx * g.distance(), a.y() + ny * g.distance(), b.x() + nx * g.distance(),
+				b.y() + ny * g.distance() };
 	}
 
 	public static byte[] png(BufferedImage img) {

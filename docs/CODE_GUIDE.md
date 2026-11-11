@@ -265,7 +265,7 @@ Spring Data JPA 인터페이스 16개. 메서드 이름으로 쿼리를 만들�
 |---|---|
 | `PdfWriter` | PDFBox 로 A4 에 위에서 아래로 쓰는 도구: 제목·문단(자동 줄바꿈)·표·그림·쪽 넘김 |
 | `KoreanFont` | PDF 한글 글꼴 찾기: `app.report.font` → 윈도 맑은 고딕 → 맥 → 리눅스 나눔·Noto |
-| `RoomPlanRenderer` | 방 평면도 + 칸 색 + 창문 + 표시점을 PNG 로 (글자 없이 그려 글꼴과 무관) |
+| `RoomPlanRenderer` | 방 평면도 + 칸 색 + 창문 + 안쪽 창 점선 + 표시점을 PNG 로 (글자 없이 그려 글꼴과 무관) |
 
 ---
 
@@ -371,7 +371,7 @@ DB 없이 브라우저에서만 돌아가는 독립 프로그램이라 ② 에 �
 
 ## 6. 테스트
 
-`./gradlew build` 로 **187개** 실행 (메모리 SQLite, `src/test/resources/application.properties`).
+`./gradlew build` 로 **189개** 실행 (메모리 SQLite, `src/test/resources/application.properties`).
 
 | 패키지 | 무엇을 | 예 |
 |---|---|---|

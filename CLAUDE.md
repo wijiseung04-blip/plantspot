@@ -75,7 +75,7 @@ data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 J
 
 ## 4. 현재 코드 상태 (아두이노 전까지 구현)
 
-빌드·테스트: `./gradlew build` (단위·API·화면 테스트 187개). 서버를 실행해 브라우저로도 확인함.
+빌드·테스트: `./gradlew build` (단위·API·화면 테스트 189개). 서버를 실행해 브라우저로도 확인함.
 테스트도 같은 계층 패키지(`src/test/java/com/springboot/controller|service|calculator|client|tool`, 공용 도구는 `support`).
 `src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
@@ -150,7 +150,7 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 - 바깥 창 → 발코니 → 거실 창 → 거실 구조: 발코니+거실을 한 방으로, 창문은 바깥 창. 방에 `inner_glass_wall`·`inner_glass_distance`(cm)·`inner_glass_transmittance`(유리 0.75 / +얇은 커튼 0.45 / +블라인드 0.38)
 - `PUT/DELETE /api/rooms/{id}/inner-glass` (벽 번호·방 깊이 검사, 바뀌면 RoomChanged). 방 모양이 바뀌어 벽이 없어지거나 깊이보다 멀면 자동 삭제
 - 계산: 그 벽에서 거리 > distance 인 칸만 하늘빛(lux)에 투과율을 곱함, 직사광 시간은 그대로 (`SunlightCalculator.innerGlassFactor`, 에디터 `light.js` 같은 식, parity 확인)
-- 농사로 배치장소 거리(발코니 창측 0~50cm …)가 바깥 창 기준이라 그대로 맞음. 화면: 방 화면 입력, 평면도·햇빛·추천·에디터에 파란 점선
+- 농사로 배치장소 거리(발코니 창측 0~50cm …)가 바깥 창 기준이라 그대로 맞음. 화면: 방 화면 입력, 평면도·햇빛·추천·에디터·배치도 PNG·리포트 PDF 에 파란 점선 (PDF 는 안쪽 창 설명 한 줄도)
 
 ### 5-1-1. 지형 (땅 높낮이)
 - `importTerrain -Pdem=`: ASCII Grid 에서 건물 범위 + 5km 만 잘라 → `terrain_grid`·`terrain_point` (150만 점 넘으면 몇 칸씩 건너뜀, 다시 가져오면 바꿔 넣음)

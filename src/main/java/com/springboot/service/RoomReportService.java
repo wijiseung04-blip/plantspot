@@ -88,7 +88,8 @@ public class RoomReportService {
 		} else {
 			color = RoomPlanRenderer.directColors(cells);
 		}
-		return RoomPlanRenderer.render(room.points(), room.getOrientationDeg(), SunlightService.geom(room).windows(),
+		var geom = SunlightService.geom(room);
+		return RoomPlanRenderer.render(room.points(), room.getOrientationDeg(), geom.windows(), geom.innerGlass(),
 				cells, 25, color, marks, size);
 	}
 
@@ -169,6 +170,12 @@ public class RoomReportService {
 						String.format("%.0f × %.0fcm", w.getWidth(), w.getHeight()), String.format("%.0fcm", w.getSillHeight()),
 						String.format("%.1f°", obstructionService.windowProfile(house, w.getAzimuthDeg())
 								.averageAngle(w.getAzimuthDeg(), 45)) });
+			}
+			if (room.hasInnerGlass()) {
+				double t = room.getInnerGlassTransmittance();
+				pdf.paragraph(String.format("안쪽 창(발코니 + 거실): %d번 벽(바깥 창)에서 %.0fcm 안쪽에 %s — 그 안쪽은 하늘빛 × %.2f (배치도의 파란 점선)",
+						room.getInnerGlassWall(), room.getInnerGlassDistance(),
+						t >= 0.7 ? "유리창" : t >= 0.42 ? "유리창 + 얇은 커튼" : "유리창 + 블라인드", t));
 			}
 			if (room.getWindows().isEmpty()) {
 				pdf.paragraph("등록된 창문이 없습니다.");

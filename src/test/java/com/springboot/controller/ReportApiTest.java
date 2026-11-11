@@ -7,6 +7,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -98,6 +99,9 @@ class ReportApiTest {
 			fontAvailable = false;
 		}
 		Assumptions.assumeTrue(fontAvailable, "한글 글꼴이 없는 환경");
+		mvc.perform(put(room + "/inner-glass").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"wallIndex\":2,\"distance\":100}").with(csrf()).with(user(owner)))
+				.andExpect(status().isOk());
 		byte[] pdf = mvc.perform(get(room + "/report").with(user(owner)))
 				.andExpect(status().isOk())
 				.andExpect(header().string("Content-Type", "application/pdf"))
@@ -108,6 +112,7 @@ class ReportApiTest {
 			String text = new PDFTextStripper().getText(doc);
 			assertThat(text).contains("햇빛", "하단동", "동지", "리포트식물", "거실 화분");
 			assertThat(text).contains("겨울 실내 최저 8.0"); // 식물 겨울 최저 10도 경고
+			assertThat(text).contains("안쪽 창", "100cm");
 			assertThat(doc.getNumberOfPages()).isGreaterThanOrEqualTo(2);
 		}
 	}
