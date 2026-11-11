@@ -127,6 +127,28 @@ class SunlightCalculatorTest {
 	}
 
 	@Test
+	void 안쪽_창_선보다_안쪽만_하늘빛이_줄고_직사광은_그대로() {
+		// 남쪽 벽(2번, y=300)에서 방 안쪽으로 100cm 에 거실 창 (투과율 0.75)
+		RoomGeom open = southRoom(0);
+		RoomGeom inner = open.withInnerGlass(new SunlightCalculator.InnerGlass(2, 100, 0.75));
+		LocalDate d = SeasonDay.WINTER_SOLSTICE.date(2026);
+		List<Cell> a = calc.calculate(open, LAT, LON, d, null, Options.defaults()).cells();
+		List<Cell> b = calc.calculate(inner, LAT, LON, d, null, Options.defaults()).cells();
+		for (int i = 0; i < a.size(); i++) {
+			double fromWall = 300 - a.get(i).y();
+			if (fromWall < 100) {
+				assertThat(b.get(i).lux()).as("발코니 칸 %s", fromWall).isEqualTo(a.get(i).lux());
+			} else {
+				assertThat(b.get(i).lux()).as("거실 칸 %s", fromWall).isCloseTo(a.get(i).lux() * 0.75, within(1.0));
+			}
+			assertThat(b.get(i).directMinutes()).isEqualTo(a.get(i).directMinutes());
+		}
+		// 벽 번호가 잘못되면 무시
+		assertThat(SunlightCalculator.innerGlassFactor(open.withInnerGlass(new SunlightCalculator.InnerGlass(9, 100, 0.5)),
+				new double[] { 200, 50 })).isEqualTo(1.0);
+	}
+
+	@Test
 	void ㄱ자_방의_모서리_뒤는_직사광이_들지_않는다() {
 		// 위쪽 날개의 오른쪽 위 구석(187.5, 37.5)은 동쪽 창과의 사이를 x=200 벽이 막는다
 		// ㄱ자: 아래쪽 가로 400 × 세로 150 + 왼쪽 위 200 × 150. 창은 오른쪽 벽(동쪽)에 있음.

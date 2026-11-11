@@ -46,6 +46,15 @@ public final class HouseRequests {
 			@DecimalMax(value = "1", message = "세대 위치는 -1~1입니다.") Double unitPosition) {
 	}
 
+	/** 안쪽 창 선: 벽 번호, 그 벽에서 방 안쪽으로 거리(cm), 안쪽 창 투과율(없으면 유리 한 겹 0.75) */
+	public record SaveInnerGlass(
+			@NotNull(message = "벽을 고르세요.") @Min(value = 0, message = "벽 번호가 잘못되었습니다.") Integer wallIndex,
+			@NotNull(message = "거리를 입력하세요.") @DecimalMin(value = "10", message = "거리는 10cm 이상입니다.")
+			@DecimalMax(value = "2000", message = "거리는 2000cm 이하입니다.") Double distance,
+			@DecimalMin(value = "0.05", message = "투과율은 0.05~1 입니다.")
+			@DecimalMax(value = "1", message = "투과율은 0.05~1 입니다.") Double transmittance) {
+	}
+
 	public record SaveRoom(
 			@NotBlank(message = "방 이름을 입력하세요.") @Size(max = 40, message = "방 이름은 40자 이하입니다.") String name,
 			@NotNull(message = "방 모양을 입력하세요.") @Size(min = 3, max = 30, message = "방 모양은 점 3~30개입니다.")

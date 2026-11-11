@@ -75,7 +75,7 @@ data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 J
 
 ## 4. 현재 코드 상태 (아두이노 전까지 구현)
 
-빌드·테스트: `./gradlew build` (단위·API·화면 테스트 185개). 서버를 실행해 브라우저로도 확인함.
+빌드·테스트: `./gradlew build` (단위·API·화면 테스트 189개). 서버를 실행해 브라우저로도 확인함.
 테스트도 같은 계층 패키지(`src/test/java/com/springboot/controller|service|calculator|client|tool`, 공용 도구는 `support`).
 `src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
@@ -137,6 +137,7 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 - 건물명 검색은 건물명이 비어 있는 경우가 많아 쓰지 않음
 
 ### 5-1-0. 창별 관측점 (동 안 세대 위치)
+- 층고 기본값 2.8m (`HouseService.DEFAULT_FLOOR_HEIGHT`, 아파트 보통 2.8~2.9m, 비회원 예측도 같은 값). 창 눈 높이 = (층−1) × 층고 + 1.2m
 - 집 `unit_position`(−1~1): 건물 긴 축(외곽선을 감싸는 최소 사각형의 긴 변, 0~180°)을 따라 우리 세대 위치. +1 = 긴 축 방향 끝 (예: 축 90° → 동쪽 끝)
 - 창마다 관측점 = 세대 위치에서 창 방향으로 나가 처음 만나는 우리 건물 외벽 + 0.5m (`BuildingFacade`). 외곽선 없으면 건물 중심
 - 관측점이 우리 건물 바깥이면 **우리 건물도 가림물로 넣음** (ㄷ자·ㄱ자의 다른 날개 그림자). 창이 붙은 벽은 관측점보다 뒤라 창 뒤쪽 방향으로만 잡혀 영향 없음. 집 화면 스카이라인(건물 가운데)은 계속 뺌
@@ -144,6 +145,12 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 - 방 화면 창문 표: `GET /api/rooms/{id}/window-obstructions` (창 앞 ±45° 평균, ±85° 안 최대, 방향 칸마다 `bins`: 각도·원인 OWN/BUILDING/TERRAIN/SENSOR·원인 건물 이름·거리)
 - 방 화면 **창별 스카이라인** 그림: 원인 4색(우리 건물 회색·옆 건물 초록·산 갈색·센서 주황), 창 뒤쪽 반원 빗금, 동지·춘분·하지 해 경로(`GET /api/sun/paths`)와 계절별 "해 드는 시간 · 창 뒤쪽 · 원인별 가림 시간" 요약 (칸마다 가장 높게 가린 원인 하나)
 - 화면 선택: 끝(±0.85)·중간(±0.45)·가운데, 이름은 긴 축 방향으로 "동쪽 끝/서쪽" 등
+
+### 5-1-2. 안쪽 창 선 (발코니 + 거실)
+- 바깥 창 → 발코니 → 거실 창 → 거실 구조: 발코니+거실을 한 방으로, 창문은 바깥 창. 방에 `inner_glass_wall`·`inner_glass_distance`(cm)·`inner_glass_transmittance`(유리 0.75 / +얇은 커튼 0.45 / +블라인드 0.38)
+- `PUT/DELETE /api/rooms/{id}/inner-glass` (벽 번호·방 깊이 검사, 바뀌면 RoomChanged). 방 모양이 바뀌어 벽이 없어지거나 깊이보다 멀면 자동 삭제
+- 계산: 그 벽에서 거리 > distance 인 칸만 하늘빛(lux)에 투과율을 곱함, 직사광 시간은 그대로 (`SunlightCalculator.innerGlassFactor`, 에디터 `light.js` 같은 식, parity 확인)
+- 농사로 배치장소 거리(발코니 창측 0~50cm …)가 바깥 창 기준이라 그대로 맞음. 화면: 방 화면 입력, 평면도·햇빛·추천·에디터·배치도 PNG·리포트 PDF 에 파란 점선 (PDF 는 안쪽 창 설명 한 줄도)
 
 ### 5-1-1. 지형 (땅 높낮이)
 - `importTerrain -Pdem=`: ASCII Grid 에서 건물 범위 + 5km 만 잘라 → `terrain_grid`·`terrain_point` (150만 점 넘으면 몇 칸씩 건너뜀, 다시 가져오면 바꿔 넣음)

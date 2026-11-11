@@ -143,7 +143,7 @@ domain      (JPA 엔티티) ──► SQLite 파일 data/plantspot.db
 |---|---|
 | `Building` | 가져오기 프로그램만 만듦(생성자 없음). `heightSource`: MEASURED / FLOOR_ESTIMATE / DEFAULT |
 | `House` | 건물에서 중심점·위경도를 복사. `floorElevation() = (층−1) × 층 높이`, `unitPosition()`(없으면 0) |
-| `Room` | 모양은 문자열로 저장, `points()` 로 꺼냄. 창문 목록(`@OneToMany`, cascade) |
+| `Room` | 모양은 문자열로 저장, `points()` 로 꺼냄. 창문 목록(`@OneToMany`, cascade). 안쪽 창 선(발코니+거실: 벽 번호·거리·투과율) |
 | `RoomWindow` | 방향(`azimuthDeg`)은 벽의 방향과 평면도 위쪽 방향으로 계산 |
 | `PlantSpecies` | `applyNongsaro()`(농사로 값 반영, 관리자가 조정한 변환값은 유지), `adjust()`(관리자 수정), `manual()`(직접 추가) |
 | `SunEvent` | `isNaturalLight(t)`: 시민박명 사이인가 (센서 분석에서 인공조명 빼기용) |
@@ -176,7 +176,7 @@ Spring Data JPA 인터페이스 16개. 메서드 이름으로 쿼리를 만들�
 | `AdminApiController` | `GET /api/admin/members`, `PUT /api/admin/members/{id}/role` | 관리자 |
 | `BuildingController` | `GET /api/buildings?dong&jibun`(한 지번의 건물들, 긴 축 `axis` 포함), `/api/buildings/dongs`, `/api/buildings/nearby` | 누구나 |
 | `AddressApiController` | `GET /api/address/search?query=` | 누구나 |
-| `HouseApiController` | 집 `POST/GET /api/houses`, `GET/PUT/DELETE /api/houses/{id}` · 방 `POST/GET /api/houses/{id}/rooms`, `GET/PUT/DELETE /api/rooms/{id}` · 창문 `POST/GET /api/rooms/{id}/windows`, `PUT/DELETE /api/windows/{id}` | 회원(본인) |
+| `HouseApiController` | 집 `POST/GET /api/houses`, `GET/PUT/DELETE /api/houses/{id}` · 방 `POST/GET /api/houses/{id}/rooms`, `GET/PUT/DELETE /api/rooms/{id}`, 안쪽 창 `PUT/DELETE /api/rooms/{id}/inner-glass` · 창문 `POST/GET /api/rooms/{id}/windows`, `PUT/DELETE /api/windows/{id}` | 회원(본인) |
 | `ObstructionApiController` | `GET /api/houses/{id}/obstructions`, `POST …/recalculate`, `PUT/DELETE …/measured`(센서 실측 저장·지우기), `GET /api/rooms/{id}/window-obstructions`(창별: 평균·최대와 방향 칸마다 각도·원인·원인 건물·거리) | 회원 |
 | `SunlightApiController` | `GET /api/rooms/{id}/sunlight?season=&year=` 또는 `?date=&calibrated=`, `POST …/sunlight/calculate` | 회원 |
 | `RecommendationApiController` | 추천 `GET /api/rooms/{id}/recommendations`, `POST …/refresh`, `GET …/recommendations/{plantId}`(칸별 적합도), `GET /api/rooms/{id}/plant-scores`(모든 식물 점수) · 내 식물 `POST/GET /api/my-plants`, `PUT/DELETE /api/my-plants/{id}`, `PATCH …/position`, `GET /api/my-plants/alerts` · 비회원 `POST /api/preview` | 회원 / preview 는 누구나 |
@@ -265,7 +265,7 @@ Spring Data JPA 인터페이스 16개. 메서드 이름으로 쿼리를 만들�
 |---|---|
 | `PdfWriter` | PDFBox 로 A4 에 위에서 아래로 쓰는 도구: 제목·문단(자동 줄바꿈)·표·그림·쪽 넘김 |
 | `KoreanFont` | PDF 한글 글꼴 찾기: `app.report.font` → 윈도 맑은 고딕 → 맥 → 리눅스 나눔·Noto |
-| `RoomPlanRenderer` | 방 평면도 + 칸 색 + 창문 + 표시점을 PNG 로 (글자 없이 그려 글꼴과 무관) |
+| `RoomPlanRenderer` | 방 평면도 + 칸 색 + 창문 + 안쪽 창 점선 + 표시점을 PNG 로 (글자 없이 그려 글꼴과 무관) |
 
 ---
 
@@ -334,7 +334,7 @@ DB 없이 브라우저에서만 돌아가는 독립 프로그램이라 ② 에 �
 1. 방의 창문마다 `ObstructionService.windowProfile(집, 창 방향)`: 창별 관측점(`BuildingFacade`)에서 건물·지형 가림 각도(+ 집의 센서 실측). 관측점이 외벽 바깥이라 **우리 건물도 넣어** ㄷ자 건물의 반대쪽 날개 그림자까지 계산 (창이 붙은 벽은 관측점 뒤라 창 뒤쪽에만 잡혀 영향 없음)
 2. 방 바닥을 25cm 칸으로 나눔
 3. **직사광**: 0시~24시 15분마다 해 위치 → 창마다 해가 창 앞쪽(±90°)이고 그 방향 가림 각도보다 높으면 창 네 모서리를 해 반대 방향으로 바닥(또는 선반 높이)에 투영한 사각형 → 사각형 안 칸에 15분 (빛이 방의 다른 벽을 지나면 제외)
-4. **하늘빛**: 칸마다 창 조각(20cm)에서 보이는 하늘을 CIE 흐린 하늘 휘도로 적분(가린 부분은 20%) + 내부 반사 → 주광률 × 그날 실외 확산광 × 유리 × 커튼
+4. **하늘빛**: 칸마다 창 조각(20cm)에서 보이는 하늘을 CIE 흐린 하늘 휘도로 적분(가린 부분은 20%) + 내부 반사 → 주광률 × 그날 실외 확산광 × 유리 × 커튼 × (안쪽 창 선보다 안쪽이면 안쪽 창 투과율, 발코니+거실 구조)
 5. **밝기 단계**: `LightLevel.of(lux, 직사광분)`
 6. 계절 대표일 4개는 `sunlight_summary`·`sunlight_cell` 에 저장, 다음엔 읽기만
 
@@ -371,12 +371,12 @@ DB 없이 브라우저에서만 돌아가는 독립 프로그램이라 ② 에 �
 
 ## 6. 테스트
 
-`./gradlew build` 로 **185개** 실행 (메모리 SQLite, `src/test/resources/application.properties`).
+`./gradlew build` 로 **189개** 실행 (메모리 SQLite, `src/test/resources/application.properties`).
 
 | 패키지 | 무엇을 | 예 |
 |---|---|---|
-| calculator (68) | 계산 기준값 | 부산 정오 해 고도(춘분 54.7°·하지 78.3°·동지 31.5°), EPSG:5186 변환, 건물·산 가림 각도, 창 투영 위치, 칸별 직사광, 관측점(판상형·ㄷ자), 층 규칙, 점수 분포 |
-| controller (70) | REST·권한·화면 | 가입·로그인·401/403, 집·방·창문, 남의 집 403, 층 검증 400, 끝 세대 vs 반대쪽 끝, 추천·모든 식물 점수, 파일 업·다운로드, PDF·PNG·CSV |
+| calculator (69) | 계산 기준값 | 부산 정오 해 고도(춘분 54.7°·하지 78.3°·동지 31.5°), EPSG:5186 변환, 건물·산 가림 각도, 창 투영 위치, 칸별 직사광, 관측점(판상형·ㄷ자), 층 규칙, 점수 분포 |
+| controller (71) | REST·권한·화면 | 가입·로그인·401/403, 집·방·창문, 남의 집 403, 층 검증 400, 끝 세대 vs 반대쪽 끝, 추천·모든 식물 점수, 파일 업·다운로드, PDF·PNG·CSV |
 | client (18) | 외부 응답 읽기 | 농사로 XML(XXE 막기), 천문연·ASOS, 브이월드 주소, 응답 원문 저장 |
 | service (13) | 공공데이터·지형 | ASOS 저장·맑음 판단, 지형 파일 자르기·보간·경사지 건물 |
 | tool (12) | 가져오기 | GeoPackage 도형, 건물 가져오기 결과, ASCII Grid |

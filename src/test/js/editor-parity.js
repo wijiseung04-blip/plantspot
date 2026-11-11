@@ -34,6 +34,17 @@ for (const [date, rows] of Object.entries(server)) {
 		check(`${date} 창에서 ${r[0]}cm 직사광(분)`, cells[i].directMinutes, r[2], 0);
 	});
 }
+// 안쪽 창 선 (남쪽 벽에서 150cm, 유리 0.75): 발코니 칸은 그대로, 거실 칸은 0.75배 — 서버 SunlightCalculator.innerGlassFactor 와 같음
+{
+	const inner = { ...room, innerGlass: { wallIndex: 2, distance: 150, transmittance: 0.75 } };
+	const rows = server['2026-12-22'];
+	const cells = Light.dayAt(inner, rows.map(r => [187.5, 300 - r[0]]), '2026-12-22', 35.1154, 128.9605, null);
+	rows.forEach((r, i) => {
+		const expected = r[0] > 150 ? r[1] * 0.75 : r[1];
+		check(`안쪽 창 · 창에서 ${r[0]}cm 하늘빛 lux`, Math.round(cells[i].lux), Math.round(expected), 2);
+		check(`안쪽 창 · 창에서 ${r[0]}cm 직사광(분)`, cells[i].directMinutes, r[2], 0);
+	});
+}
 if (failed) {
 	console.error(`${failed}개 불일치`);
 	process.exit(1);

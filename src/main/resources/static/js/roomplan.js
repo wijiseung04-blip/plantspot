@@ -36,6 +36,15 @@
 			s += `<rect data-i="${i}" x="${c.x - cs / 2}" y="${c.y - cs / 2}" width="${cs}" height="${cs}" fill="${fill}" stroke="var(--line)" stroke-width="${sw / 4}"><title>${tip}</title></rect>`;
 		});
 		s += `<polygon points="${pts.map(p => p.x + ',' + p.y).join(' ')}" fill="none" stroke="var(--text)" stroke-width="${sw * 1.5}"/>`;
+		// 안쪽 창 선 (발코니 + 거실): 점선
+		if (room.innerGlass && room.innerGlass.wallIndex < pts.length) {
+			const g = room.innerGlass, a = pts[g.wallIndex], b = pts[(g.wallIndex + 1) % pts.length];
+			const L = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+			let area = 0;
+			pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; area += p.x * q.y - q.x * p.y; });
+			const sg = area > 0 ? 1 : -1, nx = -uy * sg, ny = ux * sg;
+			s += `<line x1="${a.x + nx * g.distance}" y1="${a.y + ny * g.distance}" x2="${b.x + nx * g.distance}" y2="${b.y + ny * g.distance}" stroke="#4aa3df" stroke-width="${sw * 2.5}" stroke-dasharray="${sw * 6} ${sw * 4}"><title>안쪽 창 (벽에서 ${Math.round(g.distance)}cm)</title></line>`;
+		}
 		(room.windows || []).forEach(win => {
 			const a = pts[win.wallIndex], b = pts[(win.wallIndex + 1) % pts.length];
 			const L = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;

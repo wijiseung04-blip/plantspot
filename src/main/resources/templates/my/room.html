@@ -54,6 +54,27 @@
 			<button type="submit">창문 추가</button>
 		</form>
 
+		<h2>안쪽 창 (발코니 + 거실)</h2>
+		<form id="inner-form" class="card form">
+			<p class="muted">바깥 창 → 발코니 → 거실 창 → 거실처럼 <b>창이 두 겹</b>이면, 발코니와 거실을 한 방으로 등록하고 바깥 창을 창문으로 넣은 뒤
+				여기에 거실 창의 위치를 정하세요. 그 선보다 안쪽 칸은 하늘빛(밝기)이 유리 한 겹만큼 더 줄어듭니다.
+				(직사광 시간은 유리를 지나도 그대로입니다.) 농사로 배치장소 기준(발코니 창측 0~50cm … 거실 내측 300~500cm)도 바깥 창 기준이라 그대로 맞습니다.</p>
+			<div class="row">
+				<label>바깥 창이 있는 벽 <select name="wallIndex" id="inner-wall"></select></label>
+				<label>그 벽에서 거실 창까지(cm) <input name="distance" type="number" min="10" max="2000" step="5" value="150" required></label>
+				<label>거실 창
+					<select name="transmittance">
+						<option value="0.75">유리창</option>
+						<option value="0.45">유리창 + 얇은 커튼</option>
+						<option value="0.38">유리창 + 블라인드</option>
+					</select>
+				</label>
+			</div>
+			<p id="inner-now" class="muted"></p>
+			<button type="submit">안쪽 창 저장</button>
+			<button type="button" id="inner-clear" class="secondary">안쪽 창 지우기</button>
+		</form>
+
 		<h2>평면도 이미지</h2>
 		<div class="card">
 			<p class="muted">집 평면도 사진이나 그림을 올려 두면 평면도 에디터에서 밑그림으로 쓸 수 있습니다.</p>
@@ -119,6 +140,17 @@
 					const x2 = x1 + ux * win.width, y2 = y1 + uy * win.width;
 					s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--sun)" stroke-width="${sw * 4}"/>`;
 				});
+				if (r.innerGlass && r.innerGlass.wallIndex < pts.length) {
+					// 안쪽 창 선: 벽과 나란히 방 안쪽으로
+					const g = r.innerGlass, a = pts[g.wallIndex], b = pts[(g.wallIndex + 1) % pts.length];
+					const L = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+					let area = 0;
+					pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; area += p.x * q.y - q.x * p.y; });
+					const sg = area > 0 ? 1 : -1, nx = -uy * sg, ny = ux * sg;
+					s += `<line x1="${a.x + nx * g.distance}" y1="${a.y + ny * g.distance}" x2="${b.x + nx * g.distance}" y2="${b.y + ny * g.distance}" stroke="#4aa3df" stroke-width="${sw * 2.5}" stroke-dasharray="${sw * 6} ${sw * 4}"><title>안쪽 창</title></line>`;
+					const mx = (a.x + b.x) / 2 + nx * g.distance / 2, my = (a.y + b.y) / 2 + ny * g.distance / 2;
+					s += `<text x="${mx}" y="${my}" font-size="${sw * 8}" fill="var(--muted)" text-anchor="middle">발코니</text>`;
+				}
 				const cx = minX - pad / 2, cy = minY - pad / 2;
 				s += `<text x="${cx}" y="${cy}" font-size="${sw * 10}" fill="var(--accent)" text-anchor="middle" transform="rotate(${-r.orientationDeg} ${cx} ${cy})">N↑</text>`;
 				svg.innerHTML = s;
@@ -208,6 +240,19 @@
 					const len = Math.round(Math.hypot(room.shape[(i + 1) % room.shape.length].x - p.x, room.shape[(i + 1) % room.shape.length].y - p.y));
 					return `<option value="${i}">${i}번 벽 · ${DIRS[Math.round(az / 45) % 8]}향 · ${len}cm</option>`;
 				}).join('');
+				// 안쪽 창: 벽 목록(기본은 창문이 있는 첫 벽)과 지금 값
+				const inf = document.getElementById('inner-form');
+				document.getElementById('inner-wall').innerHTML = document.getElementById('wall').innerHTML;
+				if (room.innerGlass) {
+					inf.wallIndex.value = room.innerGlass.wallIndex;
+					inf.distance.value = room.innerGlass.distance;
+					const opt = [...inf.transmittance.options].find(o => Math.abs(Number(o.value) - room.innerGlass.transmittance) < 0.01);
+					if (opt) inf.transmittance.value = opt.value;
+					document.getElementById('inner-now').textContent = `지금: ${room.innerGlass.wallIndex}번 벽에서 ${Math.round(room.innerGlass.distance)}cm 안쪽에 거실 창 (투과율 ${room.innerGlass.transmittance}) — 평면도의 파란 점선`;
+				} else {
+					if (room.windows.length) inf.wallIndex.value = room.windows[0].wallIndex;
+					document.getElementById('inner-now').textContent = '지금: 안쪽 창 없음';
+				}
 				let obs = [];
 				let paths = [];
 				try {
@@ -237,6 +282,18 @@
 				try { await api('/api/windows/' + del, { method: 'DELETE' }); await load(); } catch (e) { show(e); }
 			});
 
+			document.getElementById('inner-form').addEventListener('submit', async (ev) => {
+				ev.preventDefault();
+				const f = ev.target;
+				try {
+					await api(`/api/rooms/${id}/inner-glass`, { method: 'PUT', json: {
+						wallIndex: Number(f.wallIndex.value), distance: Number(f.distance.value), transmittance: Number(f.transmittance.value) } });
+					await load();
+				} catch (e) { show(e); }
+			});
+			document.getElementById('inner-clear').addEventListener('click', async () => {
+				try { await api(`/api/rooms/${id}/inner-glass`, { method: 'DELETE' }); await load(); } catch (e) { show(e); }
+			});
 			document.getElementById('window-form').addEventListener('submit', async (ev) => {
 				ev.preventDefault();
 				const f = new FormData(ev.target);
