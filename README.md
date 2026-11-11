@@ -212,7 +212,7 @@ java -jar build/libs/plantspot-0.0.1-SNAPSHOT.jar
 | 평가 항목 | 이 프로젝트에서 |
 |---|---|
 | 회원 / 비회원 / 관리자 | Spring Security 7, 세션 로그인(JSON), `/my/**` 회원·`/admin/**` 관리자, 비회원은 간단 예측·식물 검색·에디터 |
-| 파일 업로드·다운로드 | 평면도·식물 사진·센서 기록 업로드, PDF 리포트·계절별 배치도 PNG·측정 CSV 다운로드 |
+| 파일 업로드·다운로드 | 평면도·식물 사진·센서 기록 업로드, PDF 리포트·계절별 배치도 PNG·칸별 햇빛 CSV·ASOS CSV 다운로드 |
 | 3계층 | `controller → service → repository → domain` 패키지 |
 | REST·검증·예외·로그 | `/api/**` 자원 중심 URL, Bean Validation + 서비스 검증(예: 건물 층수보다 높은 층 막기), `GlobalExceptionHandler` 공통 오류 JSON, SLF4J 로그 |
 | DB 파일 제출 | SQLite `data/plantspot.db` |
