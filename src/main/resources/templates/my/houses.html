@@ -17,6 +17,7 @@
 				<label>동 <select name="dong" id="dong" required></select></label>
 				<label>지번 <input name="jibun" placeholder="예: 1160-6" required></label>
 			</div>
+			<div id="parcel-box"></div>
 			<div class="row">
 				<label>집 이름 <input name="name" placeholder="예: 우리 집" required maxlength="40"></label>
 				<label>층 <input name="floor" type="number" min="1" max="80" value="1" required></label>
@@ -41,13 +42,16 @@
 			let buildingId = null;
 			const unit = document.querySelector('#house-form [name=unitPosition]');
 			fillUnitPosition(unit, null, 0);
-			// 동·지번을 직접 고치면 주소 검색으로 고른 건물은 풀린다 (세대 위치는 등록 후 집 화면에서 고를 수 있음)
+			// 동·지번을 직접 고치면 주소 검색으로 고른 건물은 풀리고, 지번 칸을 벗어나면 그 지번의 건물 목록이 뜬다
 			['dong', 'jibun'].forEach(n => document.querySelector(`#house-form [name=${n}]`).addEventListener('input', () => {
 				buildingId = null; fillUnitPosition(unit, null, 0);
 			}));
+			const picked = (b) => { buildingId = b.buildingId; fillUnitPosition(unit, b.axis ?? null, Number(unit.value)); };
+			const lookup = parcelLookup(document.getElementById('dong'), document.querySelector('#house-form [name=jibun]'),
+				document.getElementById('parcel-box'), picked);
 			addressSearch(document.getElementById('address-box'), (b) => {
-				buildingId = b.buildingId;
-				fillUnitPosition(unit, b.axis ?? null, Number(unit.value));
+				picked(b);
+				lookup.clear();
 				selectDong(document.getElementById('dong'), b.dong);
 				document.querySelector('#house-form [name=jibun]').value = b.jibun;
 				const name = document.querySelector('#house-form [name=name]');
