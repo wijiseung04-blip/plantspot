@@ -47,9 +47,9 @@ src/main/java/com/springboot
 ├── domain/       JPA 엔티티·enum (Member, Building, House, Room, RoomWindow, PlantSpecies, SunlightCell …)
 ├── dto/          요청·응답 객체 (HouseRequests, HouseResponses, SignupForm …)
 ├── calculator/   계산 로직 (SolarCalculator, ObstructionCalculator, BuildingFacade, TerrainCalculator, SunlightCalculator, PlantScorer, TmConverter …)
-├── client/       외부 API 호출 (농사로·천문연·기상청·브이월드·Open-Meteo 고도)
+├── client/       외부 API 호출 (농사로·천문연·기상청·브이월드)
 ├── report/       PDF·PNG 만들기 (PdfWriter, RoomPlanRenderer, KoreanFont)
-├── tool/         ① 데이터 생성 프로그램 (BuildingImporter, PlantImportRunner, WeatherCollectRunner, TerrainImportRunner, GpkgGeometryReader)
+├── tool/         ① 데이터 생성 프로그램 (BuildingImporter, PlantImportRunner, WeatherCollectRunner, TerrainImportRunner, GpkgGeometryReader, AscGridReader)
 ├── config/       SecurityConfig, PasswordConfig, AdminInitializer, DataDirectoryInitializer, SchemaUpgrade(예전 DB의 enum check 제약 고치기)
 ├── security/     LoginMember (로그인 회원)
 ├── event/        HouseEvents, PlantEvents (계산 결과를 낡게 만드는 변경 알림)
@@ -80,7 +80,7 @@ data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 J
 `src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
 **데이터 생성 프로그램 (① tool 패키지 — 웹 서버 없이 실행 후 종료, DB 설정은 application.properties)**
-- `./gradlew importBuildings -Pgpkg=경로` / `./gradlew importPlants` / `./gradlew collectWeather -Pfrom= -Pto=` / `./gradlew importTerrain` (건물 먼저, 끊기면 다시 실행하면 이어서 받음)
+- `./gradlew importBuildings -Pgpkg=경로` / `./gradlew importPlants` / `./gradlew collectWeather -Pfrom= -Pto=` / `./gradlew importTerrain -Pdem=경로.asc` (건물 먼저)
 
 **주의할 점 (작업하며 확인한 것)**
 - SQLite에서 id가 자동 번호(rowid)가 되려면 칸 타입이 정확히 `integer` → 모든 엔티티 id에 `@Column(columnDefinition = "integer")`. `SchemaTest`가 검사
@@ -111,7 +111,7 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 | 한국천문연구원 출몰시각 | 공공데이터포털 API, XML | 키 발급 완료 | `api.kasi.service-key` |
 | 기상청 ASOS 시간자료 | 공공데이터포털 API, JSON/XML | 키 발급 완료 | `api.kma.service-key`, `api.kma.station-id` |
 | 농촌진흥청 실내정원용 식물 | 농사로 Open API, XML | 키 승인, 가져오기 확인 | `api.nongsaro.api-key` |
-| 지형(땅 높이) | Open-Meteo 고도 API (Copernicus DEM GLO-90, 90m), JSON, 키 없음, 비상업 무료·출처 표시 | 코드 완료, **사용자 PC에서 importTerrain 실행 필요** | - |
+| 지형(땅 높이) | 수치표고모델(DEM) 파일 → QGIS 에서 EPSG:5186, Arc/Info ASCII Grid(.asc) 로 저장 | 코드 완료, **사용자 PC에서 파일 받아 importTerrain 실행 필요** | - |
 | 브이월드 주소 검색 | 검색 API(주소, EPSG:5186 좌표) | 키 발급, **도로명주소로 건물 찾기에 사용** | `api.vworld.key` (`api.vworld.domain` 필요 시) |
 
 ### 5-1. GIS 건물통합정보
@@ -140,11 +140,13 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 - 화면 선택: 끝(±0.85)·중간(±0.45)·가운데, 이름은 긴 축 방향으로 "동쪽 끝/서쪽" 등
 
 ### 5-1-1. 지형 (땅 높낮이)
-- `importTerrain`: 건물 범위 + 5km 를 90m 격자(약 4~5만 점)로 나눠 100점씩 고도 API 호출 → `terrain_grid`·`terrain_point`
+- `importTerrain -Pdem=`: ASCII Grid 에서 건물 범위 + 5km 만 잘라 → `terrain_grid`·`terrain_point` (150만 점 넘으면 몇 칸씩 건너뜀, 다시 가져오면 바꿔 넣음)
+- 고도 API(Open-Meteo)는 점 하나 = 호출 1번(시간당 5,000·하루 10,000)이라 사하구 5.6만 점에서 한도에 걸려 **버림** → 파일 방식
+- 파일: Copernicus DEM GLO-30(30m, 무료) 또는 국토지리정보원 DEM. QGIS 「워프(재투영)」 EPSG:5186·해상도 한 값 → 「다른 이름으로 저장」 Arc/Info ASCII Grid
 - 가림 각도 = max(건물, 지형). 건물은 (그 건물 땅 높이 − 우리 땅 높이)를 높이에 더함(경사지), 지형(산)은 300m~10km, 지구 곡률·굴절 보정
 - 300m 안은 지형으로 세지 않음: Copernicus DEM 은 건물·나무가 섞인 표면 높이라 건물을 두 번 세게 됨
 - 지형 자료를 나중에 넣으면 집 가림 각도를 다음 조회 때 자동으로 다시 계산 (obstruction_angle 출처 TERRAIN)
-- 설정: `plantspot.terrain.spacing`(90) / `.buffer`(5000) / `.delay-ms`(300), `api.elevation.url`
+- 설정: `plantspot.terrain.buffer`(5000) / `.max-points`(1500000)
 
 ### 5-2. 한국천문연구원 출몰시각
 - 지역별/위치별 조회, 응답: 일출·일몰, **시민박명(아침·저녁)**, 항해박명, 천문박명

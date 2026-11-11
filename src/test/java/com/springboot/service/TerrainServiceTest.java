@@ -1,45 +1,41 @@
 package com.springboot.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.springboot.calculator.TmConverter;
-import com.springboot.calculator.TmConverter.LatLon;
-import com.springboot.client.ElevationApi;
 import com.springboot.domain.Role;
 import com.springboot.security.LoginMember;
 import com.springboot.support.TestBuildings;
 
-/** 고도 API(가짜) → 격자 저장 → 가림 각도에 경사·산 반영 */
-@SpringBootTest(properties = { "plantspot.terrain.buffer=1500", "plantspot.terrain.delay-ms=0" })
+/** DEM 파일(ASCII Grid) → 격자 저장 → 가림 각도에 경사·산 반영 */
+@SpringBootTest(properties = "plantspot.terrain.buffer=1500")
 @AutoConfigureMockMvc
 @Transactional
 class TerrainServiceTest {
 
 	static final double HX = 378731.47;
 	static final double HY = 281659.43;
-
-	@MockitoBean
-	ElevationApi api;
 
 	@Autowired
 	TerrainService terrain;
@@ -53,39 +49,63 @@ class TerrainServiceTest {
 	@Autowired
 	JdbcTemplate jdbc;
 
-	/** 남쪽으로 오르막인 비탈 (1m 남쪽 = 0.2m 높음, 북쪽은 내리막) */
-	private void slopeToSouth() {
-		given(api.maxBatch()).willReturn(100);
-		given(api.sourceName()).willReturn("가짜");
-		given(api.elevations(anyList())).willAnswer(inv -> {
-			List<LatLon> pts = inv.getArgument(0);
-			double[] z = new double[pts.size()];
-			for (int i = 0; i < z.length; i++) {
-				TmConverter.Tm tm = TmConverter.fromLatLon(pts.get(i).latitude(), pts.get(i).longitude());
-				z[i] = 100 + (HY - tm.y()) * 0.2;
+	@TempDir
+	Path dir;
+
+	/**
+	 * 집 둘레 ±3km 를 덮는 30m 격자 ASCII Grid. 남쪽으로 오르막인 비탈 (1m 남쪽 = 0.2m 높음, 북쪽은 내리막).
+	 * 북서쪽 모서리 한 칸은 NODATA.
+	 */
+	private Path slopeFile() throws IOException {
+		int n = 201;
+		double cell = 30;
+		double xll = HX - 3000 - cell / 2;
+		double yll = HY - 3000 - cell / 2;
+		StringBuilder sb = new StringBuilder();
+		sb.append("ncols ").append(n).append("\nnrows ").append(n).append('\n');
+		sb.append(String.format(Locale.ROOT, "xllcorner %.3f%nyllcorner %.3f%ncellsize %.0f%nNODATA_value -9999%n",
+				xll, yll, cell));
+		for (int row = 0; row < n; row++) {
+			double y = yll + (n - 1 - row + 0.5) * cell;
+			for (int col = 0; col < n; col++) {
+				double z = row == 0 && col == 0 ? -9999 : 100 + (HY - y) * 0.2;
+				sb.append(String.format(Locale.ROOT, "%.2f", z)).append(col + 1 < n ? ' ' : '\n');
 			}
-			return z;
-		});
+		}
+		Path f = dir.resolve("dem.asc");
+		Files.writeString(f, sb.toString());
+		return f;
 	}
 
 	@Test
-	void 격자를_받아_저장하고_땅_높이를_보간한다() {
+	void 파일에서_건물_범위만_잘라_저장하고_땅_높이를_보간한다() throws Exception {
 		TestBuildings.insertHadan(jdbc);
-		slopeToSouth();
 
-		TerrainService.ImportResult r = terrain.importAll(p -> {
+		TerrainService.ImportResult r = terrain.importFile(slopeFile(), m -> {
 		});
 
-		assertThat(r.fetched()).isEqualTo(r.total()).isGreaterThan(1000);
-		assertThat(terrain.groundAt(HX, HY)).isCloseTo(100, within(10.0));
-		assertThat(terrain.groundAt(HX, HY - 500)).isCloseTo(200, within(10.0));
+		// 여유 1.5km → 약 ±1.5km = 101×101 점 (6km 파일에서 잘라냄)
+		assertThat(r.nx()).isBetween(100, 103);
+		assertThat(r.points()).isGreaterThan(10_000);
+		assertThat(terrain.groundAt(HX, HY)).isCloseTo(100, within(1.0));
+		assertThat(terrain.groundAt(HX, HY - 500)).isCloseTo(200, within(1.0));
 		assertThat(terrain.status().available()).isTrue();
+		assertThat(terrain.status().source()).isEqualTo("dem.asc");
 
-		// 다시 실행하면 받은 점은 건너뛴다
-		TerrainService.ImportResult again = terrain.importAll(p -> {
+		// 다시 가져오면 이전 자료를 바꾼다
+		TerrainService.ImportResult again = terrain.importFile(slopeFile(), m -> {
 		});
-		assertThat(again.fetched()).isZero();
-		assertThat(again.skipped()).isEqualTo(r.total());
+		assertThat(jdbc.queryForObject("select count(*) from terrain_point", Integer.class)).isEqualTo(again.points());
+		assertThat(jdbc.queryForObject("select count(*) from terrain_grid", Integer.class)).isEqualTo(1);
+	}
+
+	@Test
+	void 좌표계가_다르면_알려준다() throws Exception {
+		TestBuildings.insertHadan(jdbc);
+		Path f = dir.resolve("wgs84.asc");
+		Files.writeString(f, "ncols 2\nnrows 2\nxllcorner 128.9\nyllcorner 35.0\ncellsize 0.0003\n1 2\n3 4\n");
+		assertThatThrownBy(() -> terrain.importFile(f, m -> {
+		})).hasMessageContaining("EPSG:5186");
 	}
 
 	@Test
@@ -93,8 +113,7 @@ class TerrainServiceTest {
 		TestBuildings.insertHadan(jdbc);
 		// 정남 50m, 높이 10m 건물 → 평지라면 atan(8.8/50) = 10.0°, 땅이 10m 높아 atan(18.8/50) = 20.6°
 		TestBuildings.insert(jdbc, "하단동", "2000", HX, HY - 50, 10, "MEASURED");
-		slopeToSouth();
-		terrain.importAll(p -> {
+		terrain.importFile(slopeFile(), m -> {
 		});
 
 		LoginMember owner = new LoginMember(memberService.create("tterrain", "password123", "주인", Role.USER));
