@@ -65,6 +65,9 @@ public class PlantImportService {
 			}
 		} while (all.size() < total);
 		log.info("농사로 목록 {}건 (totalCount {})", all.size(), total);
+		if (all.isEmpty()) {
+			throw new IllegalStateException("농사로 목록이 비어 있습니다. 키 승인 상태를 확인하고, 받은 응답(data/nongsaro-sample/gardenList.xml)을 열어 보세요.");
+		}
 
 		int created = 0;
 		int updated = 0;

@@ -42,3 +42,4 @@ data/uploads/
 data/*.db
 data/*.db-*
 
+data/nongsaro-sample/
