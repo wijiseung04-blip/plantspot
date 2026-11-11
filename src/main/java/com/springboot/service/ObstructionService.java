@@ -2,6 +2,8 @@ package com.springboot.service;
 
 import com.springboot.calculator.ObstructionCalculator;
 import com.springboot.calculator.ObstructionProfile;
+import com.springboot.calculator.TerrainCalculator;
+import com.springboot.calculator.TerrainModel;
 import com.springboot.domain.ObstructionAngle;
 import com.springboot.domain.ObstructionSource;
 import com.springboot.repository.ObstructionAngleRepository;
@@ -25,7 +27,11 @@ import com.springboot.security.LoginMember;
 import com.springboot.calculator.ObstructionCalculator.Obstacle;
 import com.springboot.calculator.ObstructionCalculator.Skyline;
 
-/** 방향별 가림 각도 계산·저장. [① 분석 후 저장: 해 위치와 결합할 가림 각도] */
+/**
+ * 방향별 가림 각도 계산·저장. [① 분석 후 저장: 해 위치와 결합할 가림 각도]
+ * 공공데이터 값 = max(건물, 지형). 건물은 300m 안, 땅 높이 차(경사지)를 더해 계산하고, 지형(산)은 300m~10km.
+ * 지형 자료(importTerrain)가 없으면 평지로 보고 건물만 계산한다.
+ */
 @Service
 @Transactional(readOnly = true)
 public class ObstructionService {
@@ -36,24 +42,29 @@ public class ObstructionService {
 	public static final double SEARCH_RADIUS_M = 300;
 	/** 층 바닥에서 눈(창 가운데) 높이(m) */
 	public static final double EYE_ABOVE_FLOOR_M = 1.2;
+	/** 산 스카이라인을 보는 최대 거리(m) */
+	public static final double TERRAIN_MAX_M = 10_000;
 
 	private final ObstructionAngleRepository repository;
 	private final BuildingRepository buildings;
 	private final HouseService houseService;
 	private final ApplicationEventPublisher events;
+	private final TerrainService terrain;
 
 	public ObstructionService(ObstructionAngleRepository repository, BuildingRepository buildings,
-			HouseService houseService, ApplicationEventPublisher events) {
+			HouseService houseService, ApplicationEventPublisher events, TerrainService terrain) {
 		this.repository = repository;
 		this.buildings = buildings;
 		this.houseService = houseService;
 		this.events = events;
+		this.terrain = terrain;
 	}
 
 	/** 층이 바뀌면 건물 데이터 값을 지워 다음 조회 때 다시 계산한다. */
 	@EventListener
 	public void onHouseChanged(HouseEvents.HouseChanged e) {
 		repository.deleteByHouseAndSource(e.houseId(), ObstructionSource.BUILDING);
+		repository.deleteByHouseAndSource(e.houseId(), ObstructionSource.TERRAIN);
 	}
 
 	@EventListener
@@ -61,14 +72,50 @@ public class ObstructionService {
 		repository.deleteByHouse(e.houseId());
 	}
 
-	/** 집 위치·층에서 본 건물 데이터 스카이라인 (저장하지 않음, 비회원 간단 예측에도 사용). */
+	/**
+	 * 집 위치·층에서 본 건물 데이터 스카이라인 (저장하지 않음).
+	 * eyeHeight 는 우리 땅에서 잰 높이. 지형 자료가 있으면 건물마다 (그 건물 땅 높이 − 우리 땅 높이)를 높이에 더한다.
+	 */
 	public Skyline computeFromBuildings(double x, double y, double eyeHeight, Long excludeBuildingId) {
+		double ground = terrain.groundAt(x, y);
 		List<Obstacle> obstacles = buildings.findInBox(x - SEARCH_RADIUS_M, x + SEARCH_RADIUS_M,
 				y - SEARCH_RADIUS_M, y + SEARCH_RADIUS_M).stream()
 				.filter(b -> !Objects.equals(b.getId(), excludeBuildingId))
-				.map(b -> new Obstacle(b.getId(), b.getHeight(), b.getCenterX(), b.getCenterY(), b.getFootprintWkt()))
+				.map(b -> new Obstacle(b.getId(), b.getHeight() + groundDiff(ground, b.getCenterX(), b.getCenterY()),
+						b.getCenterX(), b.getCenterY(), b.getFootprintWkt()))
 				.toList();
 		return ObstructionCalculator.calculate(x, y, eyeHeight, obstacles);
+	}
+
+	private double groundDiff(double ground, double x, double y) {
+		if (Double.isNaN(ground)) {
+			return 0;
+		}
+		double g = terrain.groundAt(x, y);
+		return Double.isNaN(g) ? 0 : g - ground;
+	}
+
+	/** 땅 높낮이(산) 스카이라인. 지형 자료가 없으면 null. */
+	public TerrainCalculator.TerrainSkyline computeFromTerrain(double x, double y, double eyeHeight) {
+		TerrainModel model = terrain.model();
+		double ground = model == null ? Double.NaN : model.elevationAt(x, y);
+		if (Double.isNaN(ground)) {
+			return null;
+		}
+		return TerrainCalculator.calculate(model, x, y, ground + eyeHeight, SEARCH_RADIUS_M, TERRAIN_MAX_M);
+	}
+
+	/** 공공데이터(건물 + 지형) 프로필 — 비회원 간단 예측용 (저장하지 않음). */
+	public ObstructionProfile publicProfile(double x, double y, double eyeHeight, Long excludeBuildingId) {
+		Skyline sky = computeFromBuildings(x, y, eyeHeight, excludeBuildingId);
+		TerrainCalculator.TerrainSkyline land = computeFromTerrain(x, y, eyeHeight);
+		double[] angles = sky.angles().clone();
+		if (land != null) {
+			for (int i = 0; i < angles.length; i++) {
+				angles[i] = Math.max(angles[i], land.angles()[i]);
+			}
+		}
+		return new ObstructionProfile(angles, ObstructionProfile.empty().sensor());
 	}
 
 	public static double eyeHeight(House house) {
@@ -87,31 +134,42 @@ public class ObstructionService {
 		Building own = house.getBuilding();
 		Skyline sky = computeFromBuildings(house.getCenterX(), house.getCenterY(), eyeHeight(house),
 				own != null ? own.getId() : null);
+		TerrainCalculator.TerrainSkyline land = computeFromTerrain(house.getCenterX(), house.getCenterY(),
+				eyeHeight(house));
 		repository.deleteByHouseAndSource(house.getId(), ObstructionSource.BUILDING);
+		repository.deleteByHouseAndSource(house.getId(), ObstructionSource.TERRAIN);
 		List<ObstructionAngle> rows = new ArrayList<>();
 		for (int i = 0; i < ObstructionCalculator.BINS; i++) {
 			rows.add(new ObstructionAngle(house, i * ObstructionCalculator.BIN_DEG, sky.angles()[i],
 					ObstructionSource.BUILDING, sky.causeIds()[i] >= 0 ? sky.causeIds()[i] : null,
 					sky.causeIds()[i] >= 0 ? sky.distances()[i] : null));
+			if (land != null) {
+				rows.add(new ObstructionAngle(house, i * ObstructionCalculator.BIN_DEG, land.angles()[i],
+						ObstructionSource.TERRAIN, null, land.angles()[i] > 0 ? land.distances()[i] : null));
+			}
 		}
 		repository.saveAll(rows);
 		events.publishEvent(new ObstructionChanged(house.getId()));
-		log.info("가림 각도 계산: 집 {} (눈 높이 {}m)", house.getId(), eyeHeight(house));
+		log.info("가림 각도 계산: 집 {} (눈 높이 {}m, 지형 {})", house.getId(), eyeHeight(house),
+				land != null ? "반영" : "자료 없음");
 	}
 
 	/** 계산에 쓸 프로필. 건물 데이터 값이 아직 없으면 계산해서 저장한다. */
 	@Transactional
 	public ObstructionProfile profile(House house) {
 		List<ObstructionAngle> rows = repository.findByHouseIdOrderByAzimuthBinAsc(house.getId());
-		if (rows.stream().noneMatch(r -> r.getSource() == ObstructionSource.BUILDING)) {
+		boolean stale = rows.stream().noneMatch(r -> r.getSource() == ObstructionSource.BUILDING)
+				// 지형 자료를 나중에 가져왔으면 다시 계산
+				|| (terrain.model() != null && rows.stream().noneMatch(r -> r.getSource() == ObstructionSource.TERRAIN));
+		if (stale) {
 			recalculate(house);
 			rows = repository.findByHouseIdOrderByAzimuthBinAsc(house.getId());
 		}
 		ObstructionProfile p = ObstructionProfile.empty();
 		for (ObstructionAngle r : rows) {
 			int bin = r.getAzimuthBin() / ObstructionCalculator.BIN_DEG;
-			if (r.getSource() == ObstructionSource.BUILDING) {
-				p.building()[bin] = r.getAngleDeg();
+			if (r.getSource() == ObstructionSource.BUILDING || r.getSource() == ObstructionSource.TERRAIN) {
+				p.building()[bin] = Math.max(p.building()[bin], r.getAngleDeg());
 			} else {
 				p.sensor()[bin] = r.getAngleDeg();
 			}
@@ -130,16 +188,23 @@ public class ObstructionService {
 		List<ObstructionView> result = new ArrayList<>();
 		for (int i = 0; i < ObstructionCalculator.BINS; i++) {
 			int bin = i * ObstructionCalculator.BIN_DEG;
-			ObstructionAngle b = rows.stream()
-					.filter(r -> r.getAzimuthBin() == bin && r.getSource() == ObstructionSource.BUILDING)
-					.findFirst().orElse(null);
+			ObstructionAngle b = find(rows, bin, ObstructionSource.BUILDING);
+			ObstructionAngle t = find(rows, bin, ObstructionSource.TERRAIN);
 			double sensor = p.sensor()[i];
+			boolean byTerrain = t != null && (b == null || t.getAngleDeg() > b.getAngleDeg());
+			ObstructionAngle cause = byTerrain ? t : b;
+			ObstructionSource source = !Double.isNaN(sensor) ? ObstructionSource.SENSOR
+					: byTerrain ? ObstructionSource.TERRAIN : ObstructionSource.BUILDING;
 			result.add(new ObstructionView(bin, round(p.building()[i]), Double.isNaN(sensor) ? null : round(sensor),
-					round(p.angleAt(bin)), Double.isNaN(sensor) ? ObstructionSource.BUILDING : ObstructionSource.SENSOR,
-					b != null ? b.getBuildingId() : null,
-					b != null && b.getDistance() != null ? round(b.getDistance()) : null));
+					round(p.angleAt(bin)), source, cause != null ? cause.getBuildingId() : null,
+					cause != null && cause.getDistance() != null ? round(cause.getDistance()) : null,
+					b != null ? round(b.getAngleDeg()) : null, t != null ? round(t.getAngleDeg()) : null));
 		}
 		return result;
+	}
+
+	private static ObstructionAngle find(List<ObstructionAngle> rows, int bin, ObstructionSource source) {
+		return rows.stream().filter(r -> r.getAzimuthBin() == bin && r.getSource() == source).findFirst().orElse(null);
 	}
 
 	/**
@@ -178,9 +243,13 @@ public class ObstructionService {
 		return Math.round(v * 10) / 10.0;
 	}
 
-	/** 방향 칸 하나: 건물 데이터 값, 실측 값(없으면 null), 실제 쓰는 값. */
+	/**
+	 * 방향 칸 하나. buildingAngle = 공공데이터 값(건물·지형 중 큰 값, 보정 전), sensorAngle = 실측(없으면 null),
+	 * angle = 실제 쓰는 값, source = angle 의 출처, onlyBuildingAngle·terrainAngle = 나눠 본 값.
+	 */
 	public record ObstructionView(int azimuth, double buildingAngle, Double sensorAngle, double angle,
-			ObstructionSource source, Long buildingId, Double distance) {
+			ObstructionSource source, Long buildingId, Double distance, Double onlyBuildingAngle,
+			Double terrainAngle) {
 	}
 
 	public record MeasuredAngle(

@@ -71,6 +71,11 @@ runner('importBuildings', 'GeoPackage 건물 데이터를 building 테이블로 
 runner('importPlants', '농사로 실내정원용 식물 목록·상세를 모두 받아 plant_species 테이블에 저장한다.',
 		['--plantspot.import=plants'])
 
+// 고도 API(Open-Meteo, Copernicus DEM 90m) → terrain_grid·terrain_point (산·경사지 가림 각도)
+// 사용: ./gradlew importTerrain   (건물 데이터를 먼저 가져올 것, 끊기면 다시 실행하면 이어서 받음)
+runner('importTerrain', '건물 범위 + 5km 를 90m 격자로 나눠 땅 높이를 받아 terrain_point 테이블에 저장한다.',
+		['--plantspot.import=terrain'])
+
 // 기상청 ASOS 시간자료 → weather_hour
 // 사용: ./gradlew collectWeather -Pfrom=2026-11-01 -Pto=2026-11-07  (생략하면 최근 7일)
 runner('collectWeather', '기상청 ASOS 시간자료(일조·일사·운량)를 받아 weather_hour 테이블에 저장한다.',

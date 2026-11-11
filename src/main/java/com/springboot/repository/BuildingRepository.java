@@ -22,6 +22,10 @@ public interface BuildingRepository extends JpaRepository<Building, Long> {
 	List<Building> findInBox(@Param("minX") double minX, @Param("maxX") double maxX,
 			@Param("minY") double minY, @Param("maxY") double maxY);
 
+	/** 건물 중심점의 범위 [minX, maxX, minY, maxY] (지형 격자 범위 정하기). */
+	@Query("select min(b.centerX), max(b.centerX), min(b.centerY), max(b.centerY) from Building b")
+	List<Object[]> findExtent();
+
 	/** 화면 동 선택 목록. */
 	@Query("select distinct b.dong from Building b where b.dong is not null order by b.dong")
 	List<String> findDistinctDongs();

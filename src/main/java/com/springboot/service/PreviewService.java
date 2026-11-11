@@ -66,8 +66,7 @@ public class PreviewService {
 	public PreviewResult preview(PreviewRequest req) {
 		Building b = buildingService.choose(req.dong(), req.jibun(), req.buildingId());
 		double eye = (req.floor() - 1) * 3.0 + ObstructionService.EYE_ABOVE_FLOOR_M;
-		var sky = obstructionService.computeFromBuildings(b.getCenterX(), b.getCenterY(), eye, b.getId());
-		ObstructionProfile profile = new ObstructionProfile(sky.angles(), ObstructionProfile.empty().sensor());
+		ObstructionProfile profile = obstructionService.publicProfile(b.getCenterX(), b.getCenterY(), eye, b.getId());
 
 		double azimuth = Shape.normalize(req.windowAzimuth());
 		// 2번 벽(아래쪽)이 창 벽: 평면도를 돌려 그 벽이 창 방향을 보게 한다
@@ -96,7 +95,7 @@ public class PreviewService {
 				.toList();
 
 		List<Double> skyline = new ArrayList<>();
-		for (double a : sky.angles()) {
+		for (double a : profile.building()) {
 			skyline.add(Math.round(a * 10) / 10.0);
 		}
 		double front = profile.averageAngle(azimuth, 45);

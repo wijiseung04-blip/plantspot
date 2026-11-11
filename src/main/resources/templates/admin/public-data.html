@@ -11,6 +11,7 @@
 			<div class="card">
 				<h2 style="margin-top:0">상태</h2>
 				<p id="status" class="muted"></p>
+				<p id="terrain" class="muted"></p>
 			</div>
 			<div class="card">
 				<h2 style="margin-top:0">기상청 ASOS 시간자료 받기</h2>
@@ -55,6 +56,12 @@
 					`ASOS 지점 ${s.stationId} (부산, 활용가이드에서 확인)<br>저장된 출몰시각 ${s.sunEvents}일 · ASOS ${s.weatherHours}시간`;
 			}
 			status().catch(show);
+			api('/api/admin/terrain/status').then(t => {
+				document.getElementById('terrain').innerHTML = t.available
+					? `지형(땅 높이) ${t.points.toLocaleString()} / ${t.total.toLocaleString()}점 · ${t.spacing}m 간격 · ${escapeHtml(t.source || '')}`
+						+ (t.completedAt ? '' : ' · <b>덜 받음</b> (importTerrain 을 다시 실행하면 이어서 받음)')
+					: '지형(땅 높이) 자료 <b>없음</b> — 서버를 끄고 <code>./gradlew importTerrain</code> 실행 (없으면 평지로 계산)';
+			}).catch(show);
 
 			document.getElementById('collect').addEventListener('submit', async (ev) => {
 				ev.preventDefault();

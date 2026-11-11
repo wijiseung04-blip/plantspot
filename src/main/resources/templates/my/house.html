@@ -13,11 +13,11 @@
 		<div class="row">
 			<div class="card" style="max-width:420px"><svg id="skyline" viewBox="-120 -120 240 240" style="width:100%"></svg></div>
 			<div class="card">
-				<p class="muted">우리 층 창 높이에서 본 주변 건물의 가림 각도입니다. 가운데가 머리 위(90°), 바깥 원이 지평선(0°)입니다.
-					색칠된 부분이 건물에 가려진 하늘입니다.</p>
-				<p><span class="badge">건물 데이터</span> 공공 건물 높이로 계산 · <span class="badge warn">실측</span> 센서로 보정된 방향</p>
+				<p class="muted">우리 층 창 높이에서 본 주변 건물·산의 가림 각도입니다. 가운데가 머리 위(90°), 바깥 원이 지평선(0°)입니다.
+					색칠된 부분이 가려진 하늘입니다. 지형 자료가 있으면 땅 높낮이(경사지 건물, 10km 안의 산)도 반영합니다.</p>
+				<p><span class="badge">건물 데이터</span> 공공 건물 높이로 계산 · <span class="badge" style="background:#8d6e4a;color:#fff">산·지형</span> 고도 자료(Copernicus DEM, Open-Meteo)로 계산 · <span class="badge warn">실측</span> 센서로 보정된 방향</p>
 				<p id="sky-summary" class="muted"></p>
-				<button type="button" id="recalc" class="small secondary">건물 데이터로 다시 계산</button>
+				<button type="button" id="recalc" class="small secondary">공공데이터로 다시 계산</button>
 			</div>
 		</div>
 
@@ -97,8 +97,11 @@
 				sky.forEach(b => {
 					if (b.angle <= 0) return;
 					const p1 = polar(b.azimuth, 0), p2 = polar(b.azimuth + 5, 0), p3 = polar(b.azimuth + 5, b.angle), p4 = polar(b.azimuth, b.angle);
-					const color = b.source === 'SENSOR' ? 'var(--warn)' : 'var(--accent)';
-					s += `<polygon points="${[p1, p2, p3, p4].map(p => p.join(',')).join(' ')}" fill="${color}" fill-opacity="0.55"><title>${b.azimuth}°: ${b.angle}° (${b.source === 'SENSOR' ? '실측' : '건물 데이터'}${b.distance ? ', ' + b.distance + 'm' : ''})</title></polygon>`;
+					const color = b.source === 'SENSOR' ? 'var(--warn)' : b.source === 'TERRAIN' ? '#8d6e4a' : 'var(--accent)';
+					const what = b.source === 'SENSOR' ? '실측' : b.source === 'TERRAIN' ? '산·지형' : '건물 데이터';
+					const dist = b.distance ? (b.distance >= 1000 ? ', ' + (b.distance / 1000).toFixed(1) + 'km' : ', ' + b.distance + 'm') : '';
+					const parts = b.terrainAngle != null ? ` · 건물 ${b.onlyBuildingAngle ?? 0}° / 지형 ${b.terrainAngle}°` : '';
+					s += `<polygon points="${[p1, p2, p3, p4].map(p => p.join(',')).join(' ')}" fill="${color}" fill-opacity="0.55"><title>${b.azimuth}°: ${b.angle}° (${what}${dist})${parts}</title></polygon>`;
 				});
 				document.getElementById('skyline').innerHTML = s;
 				const south = sky.filter(b => b.azimuth >= 135 && b.azimuth < 225);

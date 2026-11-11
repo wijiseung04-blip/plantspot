@@ -4,6 +4,8 @@ package com.springboot.domain;
 public enum ObstructionSource {
 	/** 공공 건물 데이터(높이·외곽선)로 계산 */
 	BUILDING,
+	/** 고도 자료(땅 높낮이·산)로 계산 */
+	TERRAIN,
 	/** 창틀 센서 실측(해가 가림물 위로 올라온 시각의 해 고도) — 건물 데이터 값을 덮어쓴다 */
 	SENSOR
 }
