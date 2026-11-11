@@ -14,6 +14,7 @@ import com.springboot.service.SunService;
 import com.springboot.service.PublicDataService;
 import com.springboot.service.PublicDataService.CollectResult;
 import com.springboot.service.PublicDataService.Status;
+import com.springboot.service.TerrainService;
 import com.springboot.service.PublicDataService.SunCompare;
 import com.springboot.domain.SunEvent;
 import com.springboot.domain.WeatherHour;
@@ -26,9 +27,17 @@ import jakarta.validation.constraints.DecimalMin;
 public class PublicDataApiController {
 
 	private final PublicDataService service;
+	private final TerrainService terrain;
 
-	public PublicDataApiController(PublicDataService service) {
+	public PublicDataApiController(PublicDataService service, TerrainService terrain) {
 		this.service = service;
+		this.terrain = terrain;
+	}
+
+	/** 지형(땅 높이) 격자 상태 — 가져오기는 서버를 끄고 ./gradlew importTerrain */
+	@GetMapping("/api/admin/terrain/status")
+	public TerrainService.Status terrainStatus() {
+		return terrain.status();
 	}
 
 	@GetMapping("/api/sun-events")
