@@ -2,6 +2,10 @@ package com.springboot.client;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -22,10 +26,16 @@ public class NongsaroHttpApi implements NongsaroApi {
 	private final String baseUrl;
 	private final String apiKey;
 
+	/** 받은 응답 원문을 남기는 폴더 (형식 확인·오류 진단용, 키는 들어가지 않음) */
+	private final Path sampleDir;
+	private final Set<String> saved = ConcurrentHashMap.newKeySet();
+
 	public NongsaroHttpApi(@Value("${api.nongsaro.base-url:http://api.nongsaro.go.kr/service/garden}") String baseUrl,
-			@Value("${api.nongsaro.api-key:}") String apiKey) {
+			@Value("${api.nongsaro.api-key:}") String apiKey,
+			@Value("${api.nongsaro.sample-dir:data/nongsaro-sample}") String sampleDir) {
 		this.baseUrl = baseUrl;
 		this.apiKey = apiKey;
+		this.sampleDir = Path.of(sampleDir);
 	}
 
 	public boolean hasKey() {
@@ -34,13 +44,37 @@ public class NongsaroHttpApi implements NongsaroApi {
 
 	@Override
 	public NongsaroXml.Page list(int pageNo, int numOfRows) {
-		return NongsaroXml.parse(get("gardenList", Map.of("pageNo", pageNo, "numOfRows", numOfRows)));
+		return parse("gardenList", get("gardenList", Map.of("pageNo", pageNo, "numOfRows", numOfRows)));
 	}
 
 	@Override
 	public Map<String, String> detail(String cntntsNo) {
-		List<Map<String, String>> items = NongsaroXml.parse(get("gardenDtl", Map.of("cntntsNo", cntntsNo))).items();
+		List<Map<String, String>> items = parse("gardenDtl", get("gardenDtl", Map.of("cntntsNo", cntntsNo))).items();
 		return items.isEmpty() ? Map.of() : items.get(0);
+	}
+
+	/** 종류별 첫 응답은 data/nongsaro-sample/{종류}.xml 로 남기고, 읽지 못한 응답은 {종류}-error.xml 로 남긴다. */
+	private NongsaroXml.Page parse(String operation, byte[] body) {
+		if (saved.add(operation)) {
+			save(operation + ".xml", body);
+		}
+		try {
+			return NongsaroXml.parse(body);
+		} catch (RuntimeException e) {
+			Path file = save(operation + "-error.xml", body);
+			throw new IllegalStateException(e.getMessage() + (file != null ? " (받은 응답: " + file.toAbsolutePath() + ")" : ""), e);
+		}
+	}
+
+	private Path save(String name, byte[] body) {
+		try {
+			Files.createDirectories(sampleDir);
+			Path file = sampleDir.resolve(name);
+			Files.write(file, body);
+			return file;
+		} catch (IOException e) {
+			return null;
+		}
 	}
 
 	private byte[] get(String operation, Map<String, Object> params) {

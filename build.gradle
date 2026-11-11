@@ -44,7 +44,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.named('test') {
 	useJUnitPlatform()
 	// sqlite-jdbc 네이티브 라이브러리 로드 경고 제거
-	jvmArgs '--enable-native-access=ALL-UNNAMED'
+	jvmArgs '--enable-native-access=ALL-UNNAMED', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'   // 콘솔 한글
 }
 
 // ----- [① DB 데이터 생성 프로그램] 웹 서버 없이 실행하고 끝난다. DB 설정은 application(-local).properties -----
@@ -56,7 +56,7 @@ def runner = { String name, String desc, List<String> extra ->
 		classpath = sourceSets.main.runtimeClasspath
 		mainClass = 'com.springboot.PlantSpotApplication'
 		workingDir = projectDir
-		jvmArgs '--enable-native-access=ALL-UNNAMED'
+		jvmArgs '--enable-native-access=ALL-UNNAMED', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'   // 콘솔 한글
 		args = ['--spring.main.web-application-type=none'] + extra
 	}
 }
