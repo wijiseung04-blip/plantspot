@@ -45,6 +45,9 @@ class WindowObserverTest {
 	@Autowired
 	JdbcTemplate jdbc;
 
+	@jakarta.persistence.PersistenceContext
+	jakarta.persistence.EntityManager em;
+
 	LoginMember owner;
 	String house;
 	String room;
@@ -111,6 +114,25 @@ class WindowObserverTest {
 		int eastSun = JsonPath.read(eastWinter, "$.windows[0].sunMinutes");
 		int westSun = JsonPath.read(westWinter, "$.windows[0].sunMinutes");
 		assertThat(westSun).isGreaterThan(eastSun);
+	}
+
+	@Test
+	void ㄷ자_우리_건물의_날개가_마당쪽_창을_가린다() throws Exception {
+		// 우리 건물을 ㄷ자(남쪽으로 열린 마당)로 바꾸고 옆 건물은 지운다
+		jdbc.update("delete from building where jibun = '3000'");
+		jdbc.update("update building set footprint_wkt = ? where jibun = '1160-6'", String.format(Locale.ROOT,
+				"MULTIPOLYGON(((%1$f %3$f, %5$f %3$f, %5$f %4$f, %6$f %4$f, %6$f %3$f, %2$f %3$f, %2$f %7$f, %1$f %7$f, %1$f %3$f)))",
+				HX - 30, HX + 30, HY - 46, HY - 6, HX - 20, HX + 20, HY + 6));
+		em.clear();
+		mvc.perform(put(house).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"name\":\"집\",\"floor\":1,\"unitPosition\":0}").with(csrf()).with(user(owner)))
+				.andExpect(status().isOk());
+		// 몸통 남쪽 벽(마당 쪽) 창: 양쪽 날개(20m 옆, 높이 18.75m)가 비스듬히 가린다
+		assertThat(frontMax()).isGreaterThan(30);
+		// 집 화면 스카이라인(건물 가운데 기준)은 지금처럼 우리 건물을 뺀다 → 가림 없음
+		String sky = mvc.perform(get(house + "/obstructions").with(user(owner))).andReturn().getResponse()
+				.getContentAsString();
+		assertThat(JsonPath.<Number>read(sky, "$[27].angle").doubleValue()).isZero(); // 135°
 	}
 
 	@Test

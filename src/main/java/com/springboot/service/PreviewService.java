@@ -76,7 +76,7 @@ public class PreviewService {
 		// 창 관측점: 우리 건물 외벽(창 방향) 바로 앞
 		BuildingFacade.Observer o = BuildingFacade.observer(b.getFootprintWkt(), b.getCenterX(), b.getCenterY(),
 				azimuth, req.unitPosition() != null ? req.unitPosition() : 0);
-		ObstructionProfile profile = obstructionService.publicProfile(o.x(), o.y(), eye, b.getId());
+		ObstructionProfile profile = obstructionService.publicProfileAt(b, o, eye);
 		// 2번 벽(아래쪽)이 창 벽: 평면도를 돌려 그 벽이 창 방향을 보게 한다
 		double orientation = Shape.normalize(azimuth - 180);
 		var room = SunlightCalculator.room(ROOM, orientation, 230,

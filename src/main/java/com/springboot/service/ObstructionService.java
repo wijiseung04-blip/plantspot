@@ -139,11 +139,8 @@ public class ObstructionService {
 		double eye = eyeHeight(house);
 		String key = house.getId() + ":" + Math.round(azimuth * 10) + ":" + eye + ":" + house.unitPosition() + ":"
 				+ (terrain.model() != null);
-		double[] angles = windowCache.computeIfAbsent(key, k -> {
-			BuildingFacade.Observer o = observer(house, azimuth);
-			return publicProfile(o.x(), o.y(), eye, house.getBuilding() != null ? house.getBuilding().getId() : null)
-					.building();
-		});
+		double[] angles = windowCache.computeIfAbsent(key,
+				k -> publicProfileAt(house.getBuilding(), observer(house, azimuth), eye).building());
 		return new ObstructionProfile(angles.clone(), base.sensor());
 	}
 
@@ -178,6 +175,15 @@ public class ObstructionService {
 	/** 창 하나: 관측점이 건물 중심에서 떨어진 거리(m), 창 앞 ±45° 평균, 창 앞 ±85° 안 최대 가림 각도와 그 방향. */
 	public record WindowObstruction(Long windowId, double azimuth, double observerOffset, double frontAverage,
 			double frontMax, int frontMaxAzimuth, List<Double> angles) {
+	}
+
+	/**
+	 * 창 관측점(우리 건물 외벽 앞)에서 본 공공데이터 프로필. 관측점이 우리 건물 바깥이면 우리 건물도 가림물로 넣는다
+	 * (ㄷ자 건물의 반대쪽 날개 등), 아니면 뺀다. 창별 햇빛·비회원 예측에 쓴다.
+	 */
+	public ObstructionProfile publicProfileAt(Building own, BuildingFacade.Observer o, double eyeHeight) {
+		boolean includeOwn = own != null && BuildingFacade.canSeeOwnBuilding(own.getFootprintWkt(), o);
+		return publicProfile(o.x(), o.y(), eyeHeight, own == null || includeOwn ? null : own.getId());
 	}
 
 	/** 공공데이터(건물 + 지형) 프로필 — 비회원 간단 예측·창별 계산용 (저장하지 않음). */

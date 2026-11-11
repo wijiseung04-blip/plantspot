@@ -36,6 +36,42 @@ class BuildingFacadeTest {
 	}
 
 	@Test
+	void 관측점이_바깥이면_우리_건물도_가림물로_넣는다() {
+		assertThat(BuildingFacade.canSeeOwnBuilding(SLAB, BuildingFacade.observer(SLAB, 1000, 1000, 180, 0))).isTrue();
+		// 외곽선이 없으면 관측점이 중심이라 넣지 않는다
+		assertThat(BuildingFacade.canSeeOwnBuilding(null, BuildingFacade.observer(null, 1000, 1000, 180, 0))).isFalse();
+		// 관측점이 외곽선 안이면 넣지 않는다
+		assertThat(BuildingFacade.canSeeOwnBuilding(SLAB, new BuildingFacade.Observer(1000, 1000, 1))).isFalse();
+	}
+
+	@Test
+	void 일자형_남쪽_창은_우리_건물을_넣어도_창_앞이_가려지지_않는다() {
+		BuildingFacade.Observer o = BuildingFacade.observer(SLAB, 1000, 1000, 180, 0.5);
+		ObstructionCalculator.Skyline sky = ObstructionCalculator.calculate(o.x(), o.y(), 1.2,
+				java.util.List.of(new ObstructionCalculator.Obstacle(1, 30, 1000, 1000, SLAB)));
+		// 창 앞쪽(남 ±85°)은 모두 0°, 우리 벽은 창 뒤쪽(북쪽 반)에만 잡힌다
+		for (int az = 95; az <= 265; az += 5) {
+			assertThat(sky.angles()[ObstructionCalculator.binOf(az)]).as("방향 %d°", az).isZero();
+		}
+	}
+
+	@Test
+	void ㄷ자_건물_마당쪽_창은_반대쪽_날개에_가린다() {
+		// 몸통 x 970~1030, y 994~1006, 날개 x 970~980·1020~1030, y 954~994 (남쪽으로 열린 마당), 높이 30m
+		String u = "MULTIPOLYGON(((970 954, 980 954, 980 994, 1020 994, 1020 954, 1030 954, 1030 1006, 970 1006, 970 954)))";
+		BuildingFacade.Observer o = BuildingFacade.observer(u, 1000, 1000, 180, 0);
+		assertThat(o.y()).isCloseTo(993.5, within(1e-6));
+		assertThat(BuildingFacade.canSeeOwnBuilding(u, o)).isTrue();
+		ObstructionCalculator.Skyline sky = ObstructionCalculator.calculate(o.x(), o.y(), 1.2,
+				java.util.List.of(new ObstructionCalculator.Obstacle(1, 30, 1000, 990, u)));
+		// 남동·남서쪽 날개: 20m 옆 → atan(28.8/20) ≈ 55° 안팎
+		assertThat(sky.angles()[ObstructionCalculator.binOf(120)]).isGreaterThan(40);
+		assertThat(sky.angles()[ObstructionCalculator.binOf(240)]).isGreaterThan(40);
+		// 정남쪽(마당 열린 쪽)은 열려 있다
+		assertThat(sky.angles()[ObstructionCalculator.binOf(180)]).isZero();
+	}
+
+	@Test
 	void 외곽선이_없으면_중심() {
 		BuildingFacade.Observer o = BuildingFacade.observer(null, 5, 6, 180, 0.5);
 		assertThat(o.x()).isEqualTo(5);
