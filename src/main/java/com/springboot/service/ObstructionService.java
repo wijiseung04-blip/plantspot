@@ -52,7 +52,11 @@ public class ObstructionService {
 	private final ApplicationEventPublisher events;
 	private final TerrainService terrain;
 	/** 창별 공공데이터 가림 각도 (집·방향·눈 높이·세대 위치별, 집이 바뀌면 비운다) */
-	private final java.util.Map<String, double[]> windowCache = new java.util.concurrent.ConcurrentHashMap<>();
+	private final java.util.Map<String, PublicSky> windowCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** 방향 칸 72개의 공공데이터 가림 각도와 원인 (OWN 우리 건물 / BUILDING 옆 건물 / TERRAIN 지형 / NONE). */
+	public record PublicSky(double[] angles, String[] causes, long[] buildingIds, double[] distances) {
+	}
 
 	public ObstructionService(ObstructionAngleRepository repository, BuildingRepository buildings,
 			HouseService houseService, ApplicationEventPublisher events, TerrainService terrain) {
@@ -139,9 +143,15 @@ public class ObstructionService {
 		double eye = eyeHeight(house);
 		String key = house.getId() + ":" + Math.round(azimuth * 10) + ":" + eye + ":" + house.unitPosition() + ":"
 				+ (terrain.model() != null);
-		double[] angles = windowCache.computeIfAbsent(key,
-				k -> publicProfileAt(house.getBuilding(), observer(house, azimuth), eye).building());
-		return new ObstructionProfile(angles.clone(), base.sensor());
+		return new ObstructionProfile(windowSky(house, azimuth).angles().clone(), base.sensor());
+	}
+
+	/** 창 관측점에서 본 공공데이터 가림 각도와 원인 (메모리 캐시, 집이 바뀌면 비움). */
+	private PublicSky windowSky(House house, double azimuth) {
+		double eye = eyeHeight(house);
+		String key = house.getId() + ":" + Math.round(azimuth * 10) + ":" + eye + ":" + house.unitPosition() + ":"
+				+ (terrain.model() != null);
+		return windowCache.computeIfAbsent(key, k -> publicSkyAt(house.getBuilding(), observer(house, azimuth), eye));
 	}
 
 	/** 방의 창마다 관측점·창 앞 가림 각도 (방 화면). */
@@ -162,19 +172,64 @@ public class ObstructionService {
 					maxAz = (int) Math.round(((az + d) % 360 + 360) % 360);
 				}
 			}
+			PublicSky sky = windowSky(house, az);
 			List<Double> angles = new ArrayList<>();
+			List<SkyBin> bins = new ArrayList<>();
 			for (int i = 0; i < ObstructionCalculator.BINS; i++) {
-				angles.add(round(p.angleAt(i * ObstructionCalculator.BIN_DEG)));
+				double a = p.angleAt(i * ObstructionCalculator.BIN_DEG);
+				angles.add(round(a));
+				boolean sensor = !Double.isNaN(p.sensor()[i]);
+				String cause = sensor ? "SENSOR" : sky.causes()[i];
+				Long bid = !sensor && sky.buildingIds()[i] >= 0 ? sky.buildingIds()[i] : null;
+				Double dist = !sensor && sky.distances()[i] > 0 ? round(sky.distances()[i]) : null;
+				bins.add(new SkyBin(i * ObstructionCalculator.BIN_DEG, round(a), cause, bid, null, dist));
 			}
 			list.add(new WindowObstruction(w.getId(), az, round(observer(house, az).offsetFromCenter()),
-					round(p.averageAngle(az, 45)), round(max), maxAz, angles));
+					round(p.averageAngle(az, 45)), round(max), maxAz, angles, bins));
 		}
-		return list;
+		return withLabels(list, house.getBuilding());
+	}
+
+	/** 원인 건물 번호에 이름(동 이름·건물명·지번)을 붙인다. */
+	private List<WindowObstruction> withLabels(List<WindowObstruction> list, Building own) {
+		java.util.Set<Long> ids = new java.util.HashSet<>();
+		list.forEach(w -> w.bins().forEach(b -> {
+			if (b.buildingId() != null) {
+				ids.add(b.buildingId());
+			}
+		}));
+		java.util.Map<Long, String> names = new java.util.HashMap<>();
+		buildings.findAllById(ids).forEach(b -> names.put(b.getId(), buildingName(b)));
+		return list.stream().map(w -> new WindowObstruction(w.windowId(), w.azimuth(), w.observerOffset(),
+				w.frontAverage(), w.frontMax(), w.frontMaxAzimuth(), w.angles(),
+				w.bins().stream().map(b -> new SkyBin(b.azimuth(), b.angle(), b.cause(), b.buildingId(),
+						label(b, names, own), b.distance())).toList()))
+				.toList();
+	}
+
+	private static String label(SkyBin b, java.util.Map<Long, String> names, Building own) {
+		return switch (b.cause()) {
+		case "OWN" -> "우리 건물" + (own != null && names.containsKey(own.getId()) ? " (" + names.get(own.getId()) + ")" : "");
+		case "BUILDING" -> b.buildingId() != null ? names.getOrDefault(b.buildingId(), "옆 건물") : "옆 건물";
+		case "TERRAIN" -> "산·지형";
+		case "SENSOR" -> "센서 실측";
+		default -> null;
+		};
+	}
+
+	private static String buildingName(Building b) {
+		String name = b.getDongLabel() != null && !b.getDongLabel().isBlank() ? b.getDongLabel()
+				: b.getBuildingName() != null && !b.getBuildingName().isBlank() ? b.getBuildingName() : null;
+		return (name != null ? name + " · " : "") + b.getDong() + " " + b.getJibun();
+	}
+
+	/** 방향 칸 하나: 실제 쓰는 가림 각도와 주된 원인 (가장 높게 가린 것 하나). */
+	public record SkyBin(int azimuth, double angle, String cause, Long buildingId, String label, Double distance) {
 	}
 
 	/** 창 하나: 관측점이 건물 중심에서 떨어진 거리(m), 창 앞 ±45° 평균, 창 앞 ±85° 안 최대 가림 각도와 그 방향. */
 	public record WindowObstruction(Long windowId, double azimuth, double observerOffset, double frontAverage,
-			double frontMax, int frontMaxAzimuth, List<Double> angles) {
+			double frontMax, int frontMaxAzimuth, List<Double> angles, List<SkyBin> bins) {
 	}
 
 	/**
@@ -182,8 +237,38 @@ public class ObstructionService {
 	 * (ㄷ자 건물의 반대쪽 날개 등), 아니면 뺀다. 창별 햇빛·비회원 예측에 쓴다.
 	 */
 	public ObstructionProfile publicProfileAt(Building own, BuildingFacade.Observer o, double eyeHeight) {
+		return new ObstructionProfile(publicSkyAt(own, o, eyeHeight).angles(), ObstructionProfile.empty().sensor());
+	}
+
+	/** publicProfileAt 과 같은 계산 + 방향별 원인. */
+	public PublicSky publicSkyAt(Building own, BuildingFacade.Observer o, double eyeHeight) {
 		boolean includeOwn = own != null && BuildingFacade.canSeeOwnBuilding(own.getFootprintWkt(), o);
-		return publicProfile(o.x(), o.y(), eyeHeight, own == null || includeOwn ? null : own.getId());
+		Skyline sky = computeFromBuildings(o.x(), o.y(), eyeHeight, own == null || includeOwn ? null : own.getId());
+		TerrainCalculator.TerrainSkyline land = computeFromTerrain(o.x(), o.y(), eyeHeight);
+		int n = ObstructionCalculator.BINS;
+		double[] angles = new double[n];
+		String[] causes = new String[n];
+		long[] ids = new long[n];
+		double[] dist = new double[n];
+		for (int i = 0; i < n; i++) {
+			double b = sky.angles()[i];
+			double t = land != null ? land.angles()[i] : 0;
+			if (t > b) {
+				angles[i] = t;
+				causes[i] = "TERRAIN";
+				ids[i] = -1;
+				dist[i] = land.distances()[i];
+			} else if (b > 0) {
+				angles[i] = b;
+				ids[i] = sky.causeIds()[i];
+				causes[i] = own != null && ids[i] == own.getId() ? "OWN" : "BUILDING";
+				dist[i] = sky.distances()[i];
+			} else {
+				causes[i] = "NONE";
+				ids[i] = -1;
+			}
+		}
+		return new PublicSky(angles, causes, ids, dist);
 	}
 
 	/** 공공데이터(건물 + 지형) 프로필 — 비회원 간단 예측·창별 계산용 (저장하지 않음). */

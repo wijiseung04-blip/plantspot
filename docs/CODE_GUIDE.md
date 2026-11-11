@@ -177,14 +177,14 @@ Spring Data JPA 인터페이스 16개. 메서드 이름으로 쿼리를 만들�
 | `BuildingController` | `GET /api/buildings?dong&jibun`(한 지번의 건물들, 긴 축 `axis` 포함), `/api/buildings/dongs`, `/api/buildings/nearby` | 누구나 |
 | `AddressApiController` | `GET /api/address/search?query=` | 누구나 |
 | `HouseApiController` | 집 `POST/GET /api/houses`, `GET/PUT/DELETE /api/houses/{id}` · 방 `POST/GET /api/houses/{id}/rooms`, `GET/PUT/DELETE /api/rooms/{id}` · 창문 `POST/GET /api/rooms/{id}/windows`, `PUT/DELETE /api/windows/{id}` | 회원(본인) |
-| `ObstructionApiController` | `GET /api/houses/{id}/obstructions`, `POST …/recalculate`, `PUT/DELETE …/measured`(센서 실측 저장·지우기), `GET /api/rooms/{id}/window-obstructions`(창별) | 회원 |
+| `ObstructionApiController` | `GET /api/houses/{id}/obstructions`, `POST …/recalculate`, `PUT/DELETE …/measured`(센서 실측 저장·지우기), `GET /api/rooms/{id}/window-obstructions`(창별: 평균·최대와 방향 칸마다 각도·원인·원인 건물·거리) | 회원 |
 | `SunlightApiController` | `GET /api/rooms/{id}/sunlight?season=&year=` 또는 `?date=&calibrated=`, `POST …/sunlight/calculate` | 회원 |
 | `RecommendationApiController` | 추천 `GET /api/rooms/{id}/recommendations`, `POST …/refresh`, `GET …/recommendations/{plantId}`(칸별 적합도), `GET /api/rooms/{id}/plant-scores`(모든 식물 점수) · 내 식물 `POST/GET /api/my-plants`, `PUT/DELETE /api/my-plants/{id}`, `PATCH …/position`, `GET /api/my-plants/alerts` · 비회원 `POST /api/preview` | 회원 / preview 는 누구나 |
 | `PlantApiController` | `GET /api/plants?keyword&light&level&page&size`, `GET /api/plants/{id}` · 관리자 `POST /api/admin/plants`, `PUT …/{id}/conversion`, `POST …/conversion/reset`, `DELETE …/{id}`, `POST/GET /api/admin/plants/import`(가져오기 시작·진행 상황) | 누구나 / 관리자 |
 | `PublicDataApiController` | `GET /api/sun-events?date&lat&lon`, `GET /api/sun-events/compare`, `GET /api/weather/hours?date` · 관리자 `POST /api/admin/weather/collect`, `GET /api/admin/public-data/status`, `GET /api/admin/terrain/status` | 회원 / 관리자 |
 | `FileApiController` | `POST /api/files`(multipart), `GET /api/files`, `GET /api/files/{id}`, `GET /api/files/{id}/content`(다운로드·`inline=true`면 바로 보기), `DELETE /api/files/{id}` | 회원(본인) |
 | `ReportApiController` | `GET /api/rooms/{id}/report`(PDF), `…/sunlight/image`(PNG), `…/sunlight/csv`, `GET /api/weather/hours/csv` | 회원 |
-| `SunController` | `GET /api/sun?dateTime&lat&lon` (해 위치·출몰, 에디터 확인용) | 누구나 |
+| `SunController` | `GET /api/sun?dateTime&lat&lon` (해 위치·출몰), `GET /api/sun/paths?lat&lon&year` (계절 대표일 해 경로 15분 간격, 창별 스카이라인 그림용) | 누구나 |
 | `PageController` | 화면 주소 → 템플릿 이름. 로그인 회원 정보를 `me` 로 넘김 (머리글 표시용) | 주소별 |
 | `Codes` | 화면 선택 목록(빛 요구, 계절, 커튼 등)을 모델로 |
 
@@ -293,7 +293,7 @@ Spring Data JPA 인터페이스 16개. 메서드 이름으로 쿼리를 만들�
 | 햇빛 에디터 | `editor.html` + `static/editor/*` | (회원이 방을 열 때) `/api/rooms/{id}`, `/api/houses/{id}`, `/api/houses/{id}/obstructions`, `/api/my-plants`, `/api/plants` |
 | 우리 집 목록·등록 | `my/houses.html` | `/api/houses`, `/api/buildings…`, `/api/address/search` |
 | 집 | `my/house.html` | `/api/houses/{id}`, `…/obstructions`(스카이라인 SVG), `…/rooms` |
-| 방 | `my/room.html` | `/api/rooms/{id}`, `…/windows`, `…/window-obstructions`, `/api/files`(평면도 올리기) |
+| 방 | `my/room.html` | `/api/rooms/{id}`, `…/windows`, `…/window-obstructions`, `/api/sun/paths`, `/api/files`(평면도 올리기). **창별 스카이라인**: 원인 4색(우리 건물·옆 건물·산·센서), 창 뒤쪽 빗금, 동지·춘분·하지 해 경로, 계절별 해 드는 시간·원인별 가림 시간 |
 | 계절별 햇빛 | `my/sunlight.html` | `/api/rooms/{id}/sunlight`, `…/sunlight/image`, `…/sunlight/csv` |
 | 식물 추천 | `my/recommendations.html` | `…/plant-scores`(목록·관리 수준·검색), `…/recommendations/{plantId}`(적합도 지도), `/api/plants/{id}`(팝업), `…/refresh` |
 | 내 식물 | `my/plants.html` | `/api/my-plants`, `…/alerts`, `/api/files`(사진) |
@@ -371,12 +371,12 @@ DB 없이 브라우저에서만 돌아가는 독립 프로그램이라 ② 에 �
 
 ## 6. 테스트
 
-`./gradlew build` 로 **184개** 실행 (메모리 SQLite, `src/test/resources/application.properties`).
+`./gradlew build` 로 **185개** 실행 (메모리 SQLite, `src/test/resources/application.properties`).
 
 | 패키지 | 무엇을 | 예 |
 |---|---|---|
 | calculator (68) | 계산 기준값 | 부산 정오 해 고도(춘분 54.7°·하지 78.3°·동지 31.5°), EPSG:5186 변환, 건물·산 가림 각도, 창 투영 위치, 칸별 직사광, 관측점(판상형·ㄷ자), 층 규칙, 점수 분포 |
-| controller (69) | REST·권한·화면 | 가입·로그인·401/403, 집·방·창문, 남의 집 403, 층 검증 400, 끝 세대 vs 반대쪽 끝, 추천·모든 식물 점수, 파일 업·다운로드, PDF·PNG·CSV |
+| controller (70) | REST·권한·화면 | 가입·로그인·401/403, 집·방·창문, 남의 집 403, 층 검증 400, 끝 세대 vs 반대쪽 끝, 추천·모든 식물 점수, 파일 업·다운로드, PDF·PNG·CSV |
 | client (18) | 외부 응답 읽기 | 농사로 XML(XXE 막기), 천문연·ASOS, 브이월드 주소, 응답 원문 저장 |
 | service (13) | 공공데이터·지형 | ASOS 저장·맑음 판단, 지형 파일 자르기·보간·경사지 건물 |
 | tool (12) | 가져오기 | GeoPackage 도형, 건물 가져오기 결과, ASCII Grid |

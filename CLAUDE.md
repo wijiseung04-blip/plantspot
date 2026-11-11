@@ -75,7 +75,7 @@ data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 J
 
 ## 4. 현재 코드 상태 (아두이노 전까지 구현)
 
-빌드·테스트: `./gradlew build` (단위·API·화면 테스트 184개). 서버를 실행해 브라우저로도 확인함.
+빌드·테스트: `./gradlew build` (단위·API·화면 테스트 185개). 서버를 실행해 브라우저로도 확인함.
 테스트도 같은 계층 패키지(`src/test/java/com/springboot/controller|service|calculator|client|tool`, 공용 도구는 `support`).
 `src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
@@ -141,7 +141,8 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 - 창마다 관측점 = 세대 위치에서 창 방향으로 나가 처음 만나는 우리 건물 외벽 + 0.5m (`BuildingFacade`). 외곽선 없으면 건물 중심
 - 관측점이 우리 건물 바깥이면 **우리 건물도 가림물로 넣음** (ㄷ자·ㄱ자의 다른 날개 그림자). 창이 붙은 벽은 관측점보다 뒤라 창 뒤쪽 방향으로만 잡혀 영향 없음. 집 화면 스카이라인(건물 가운데)은 계속 뺌
 - 햇빛 계산(SunlightService)·리포트·비회원 예측은 창별 관측점 값, 집 화면 스카이라인은 건물 가운데 기준(센서 실측은 집 단위로 모든 창에 적용)
-- 방 화면 창문 표: `GET /api/rooms/{id}/window-obstructions` (창 앞 ±45° 평균, ±85° 안 최대)
+- 방 화면 창문 표: `GET /api/rooms/{id}/window-obstructions` (창 앞 ±45° 평균, ±85° 안 최대, 방향 칸마다 `bins`: 각도·원인 OWN/BUILDING/TERRAIN/SENSOR·원인 건물 이름·거리)
+- 방 화면 **창별 스카이라인** 그림: 원인 4색(우리 건물 회색·옆 건물 초록·산 갈색·센서 주황), 창 뒤쪽 반원 빗금, 동지·춘분·하지 해 경로(`GET /api/sun/paths`)와 계절별 "해 드는 시간 · 창 뒤쪽 · 원인별 가림 시간" 요약 (칸마다 가장 높게 가린 원인 하나)
 - 화면 선택: 끝(±0.85)·중간(±0.45)·가운데, 이름은 긴 축 방향으로 "동쪽 끝/서쪽" 등
 
 ### 5-1-1. 지형 (땅 높낮이)
