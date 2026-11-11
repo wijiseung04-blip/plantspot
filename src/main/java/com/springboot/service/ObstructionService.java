@@ -2,6 +2,7 @@ package com.springboot.service;
 
 import com.springboot.calculator.ObstructionCalculator;
 import com.springboot.calculator.ObstructionProfile;
+import com.springboot.calculator.BuildingFacade;
 import com.springboot.calculator.TerrainCalculator;
 import com.springboot.calculator.TerrainModel;
 import com.springboot.domain.ObstructionAngle;
@@ -50,6 +51,8 @@ public class ObstructionService {
 	private final HouseService houseService;
 	private final ApplicationEventPublisher events;
 	private final TerrainService terrain;
+	/** 창별 공공데이터 가림 각도 (집·방향·눈 높이·세대 위치별, 집이 바뀌면 비운다) */
+	private final java.util.Map<String, double[]> windowCache = new java.util.concurrent.ConcurrentHashMap<>();
 
 	public ObstructionService(ObstructionAngleRepository repository, BuildingRepository buildings,
 			HouseService houseService, ApplicationEventPublisher events, TerrainService terrain) {
@@ -65,6 +68,20 @@ public class ObstructionService {
 	public void onHouseChanged(HouseEvents.HouseChanged e) {
 		repository.deleteByHouseAndSource(e.houseId(), ObstructionSource.BUILDING);
 		repository.deleteByHouseAndSource(e.houseId(), ObstructionSource.TERRAIN);
+	}
+
+	@EventListener
+	public void onHouseChangedClearCache(HouseEvents.HouseChanged e) {
+		clearCache(e.houseId());
+	}
+
+	@EventListener
+	public void onObstructionChanged(ObstructionChanged e) {
+		clearCache(e.houseId());
+	}
+
+	private void clearCache(Long houseId) {
+		windowCache.keySet().removeIf(k -> k.startsWith(houseId + ":"));
 	}
 
 	@EventListener
@@ -105,7 +122,65 @@ public class ObstructionService {
 		return TerrainCalculator.calculate(model, x, y, ground + eyeHeight, SEARCH_RADIUS_M, TERRAIN_MAX_M);
 	}
 
-	/** 공공데이터(건물 + 지형) 프로필 — 비회원 간단 예측용 (저장하지 않음). */
+	/** 창 방향 azimuth 인 창의 관측점 (우리 건물 외벽 바로 앞, 동 안 세대 위치 반영). */
+	public BuildingFacade.Observer observer(House house, double azimuth) {
+		Building own = house.getBuilding();
+		return BuildingFacade.observer(own != null ? own.getFootprintWkt() : null, house.getCenterX(),
+				house.getCenterY(), azimuth, house.unitPosition());
+	}
+
+	/**
+	 * 창 하나의 가림 각도: 그 창 관측점에서 본 건물·지형 + 집에 저장된 센서 실측.
+	 * (집 화면 스카이라인은 건물 가운데 기준, 햇빛 계산은 이 창별 값을 쓴다)
+	 */
+	@Transactional
+	public ObstructionProfile windowProfile(House house, double azimuth) {
+		ObstructionProfile base = profile(house);
+		double eye = eyeHeight(house);
+		String key = house.getId() + ":" + Math.round(azimuth * 10) + ":" + eye + ":" + house.unitPosition() + ":"
+				+ (terrain.model() != null);
+		double[] angles = windowCache.computeIfAbsent(key, k -> {
+			BuildingFacade.Observer o = observer(house, azimuth);
+			return publicProfile(o.x(), o.y(), eye, house.getBuilding() != null ? house.getBuilding().getId() : null)
+					.building();
+		});
+		return new ObstructionProfile(angles.clone(), base.sensor());
+	}
+
+	/** 방의 창마다 관측점·창 앞 가림 각도 (방 화면). */
+	@Transactional
+	public List<WindowObstruction> windowViews(LoginMember me, Long roomId) {
+		com.springboot.domain.Room room = houseService.loadRoom(me, roomId);
+		House house = room.getHouse();
+		List<WindowObstruction> list = new ArrayList<>();
+		for (com.springboot.domain.RoomWindow w : room.getWindows()) {
+			double az = w.getAzimuthDeg();
+			ObstructionProfile p = windowProfile(house, az);
+			double max = 0;
+			int maxAz = (int) Math.round(az);
+			for (int d = -85; d <= 85; d += ObstructionCalculator.BIN_DEG) {
+				double a = p.angleAt(az + d);
+				if (a > max) {
+					max = a;
+					maxAz = (int) Math.round(((az + d) % 360 + 360) % 360);
+				}
+			}
+			List<Double> angles = new ArrayList<>();
+			for (int i = 0; i < ObstructionCalculator.BINS; i++) {
+				angles.add(round(p.angleAt(i * ObstructionCalculator.BIN_DEG)));
+			}
+			list.add(new WindowObstruction(w.getId(), az, round(observer(house, az).offsetFromCenter()),
+					round(p.averageAngle(az, 45)), round(max), maxAz, angles));
+		}
+		return list;
+	}
+
+	/** 창 하나: 관측점이 건물 중심에서 떨어진 거리(m), 창 앞 ±45° 평균, 창 앞 ±85° 안 최대 가림 각도와 그 방향. */
+	public record WindowObstruction(Long windowId, double azimuth, double observerOffset, double frontAverage,
+			double frontMax, int frontMaxAzimuth, List<Double> angles) {
+	}
+
+	/** 공공데이터(건물 + 지형) 프로필 — 비회원 간단 예측·창별 계산용 (저장하지 않음). */
 	public ObstructionProfile publicProfile(double x, double y, double eyeHeight, Long excludeBuildingId) {
 		Skyline sky = computeFromBuildings(x, y, eyeHeight, excludeBuildingId);
 		TerrainCalculator.TerrainSkyline land = computeFromTerrain(x, y, eyeHeight);

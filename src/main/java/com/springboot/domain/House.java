@@ -53,6 +53,13 @@ public class House {
 	@Column(name = "floor_height", nullable = false)
 	private double floorHeight;
 
+	/**
+	 * 동 안에서 우리 세대 위치: 건물 긴 축을 따라 −1(한쪽 끝) ~ 0(가운데) ~ +1(다른 쪽 끝).
+	 * +1 쪽 = 긴 축 방향(0~180°, 예: 90° 이면 동쪽 끝). 없으면 가운데. 창별 관측점에 쓴다.
+	 */
+	@Column(name = "unit_position")
+	private Double unitPosition;
+
 	@Column(name = "center_x", nullable = false)
 	private double centerX;
 
@@ -71,6 +78,11 @@ public class House {
 	private List<Room> rooms = new ArrayList<>();
 
 	protected House() {
+	}
+
+	public House(Member member, Building building, String name, int floor, double floorHeight, Double unitPosition) {
+		this(member, building, name, floor, floorHeight);
+		this.unitPosition = unitPosition;
 	}
 
 	public House(Member member, Building building, String name, int floor, double floorHeight) {
@@ -92,6 +104,19 @@ public class House {
 		this.name = name;
 		this.floor = floor;
 		this.floorHeight = floorHeight;
+	}
+
+	public void moveUnit(Double unitPosition) {
+		this.unitPosition = unitPosition;
+	}
+
+	/** 동 안 세대 위치 (−1 ~ 1, 모르면 0 = 가운데) */
+	public double unitPosition() {
+		return unitPosition == null ? 0 : unitPosition;
+	}
+
+	public Double getUnitPosition() {
+		return unitPosition;
 	}
 
 	public boolean isOwnedBy(Long memberId) {

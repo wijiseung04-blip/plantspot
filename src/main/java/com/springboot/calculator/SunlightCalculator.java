@@ -107,6 +107,12 @@ public final class SunlightCalculator {
 
 	public Result calculate(RoomGeom room, double latitude, double longitude, LocalDate date,
 			ObstructionProfile obstruction, Options opt) {
+		return calculatePerWindow(room, latitude, longitude, date, w -> obstruction, opt);
+	}
+
+	/** 창마다 다른 가림 각도(창별 관측점)로 계산한다. */
+	public Result calculatePerWindow(RoomGeom room, double latitude, double longitude, LocalDate date,
+			java.util.function.Function<WindowGeom, ObstructionProfile> obstructionFor, Options opt) {
 		List<double[]> centers = cellCenters(room.polygon(), opt.cellSize());
 		int n = centers.size();
 		int[] direct = new int[n];
@@ -123,7 +129,7 @@ public final class SunlightCalculator {
 			boolean[] lit = new boolean[n];
 			for (int w = 0; w < room.windows().size(); w++) {
 				WindowGeom win = room.windows().get(w);
-				double[][] quad = sunPatch(room, win, sun, obstruction, opt.workHeight());
+				double[][] quad = sunPatch(room, win, sun, obstructionFor.apply(win), opt.workHeight());
 				if (quad == null) {
 					continue;
 				}
@@ -144,14 +150,14 @@ public final class SunlightCalculator {
 		}
 
 		double outdoorLux = outdoorDiffuseLux(latitude, longitude, date);
-		double irc = internallyReflected(room, obstruction);
+		double irc = internallyReflected(room, obstructionFor);
 		double transmit = GLASS_TRANSMITTANCE * room.curtainTransmittance();
 		List<Cell> cells = new ArrayList<>(n);
 		double minX = room.polygon().stream().mapToDouble(Point::x).min().orElse(0);
 		double minY = room.polygon().stream().mapToDouble(Point::y).min().orElse(0);
 		for (int c = 0; c < n; c++) {
 			double[] p = centers.get(c);
-			double df = (skyComponent(room, p, obstruction, opt.workHeight()) + irc) * transmit;
+			double df = (skyComponent(room, p, obstructionFor, opt.workHeight()) + irc) * transmit;
 			double lux = df * outdoorLux;
 			int ix = (int) Math.floor((p[0] - minX) / opt.cellSize());
 			int iy = (int) Math.floor((p[1] - minY) / opt.cellSize());
@@ -231,9 +237,11 @@ public final class SunlightCalculator {
 	 * 하늘 성분(주광률 중 창으로 직접 보이는 하늘에서 오는 부분, 0~1).
 	 * CIE 흐린 하늘: L(e) = Lz(1 + 2 sin e)/3, 수평면 조도 E = 7πLz/9.
 	 */
-	private static double skyComponent(RoomGeom room, double[] c, ObstructionProfile obstruction, double workHeight) {
+	private static double skyComponent(RoomGeom room, double[] c,
+			java.util.function.Function<WindowGeom, ObstructionProfile> obstructionFor, double workHeight) {
 		double sum = 0;
 		for (WindowGeom w : room.windows()) {
+			ObstructionProfile obstruction = obstructionFor.apply(w);
 			int nu = Math.max(1, (int) Math.ceil(w.width() / PATCH_CM));
 			int nv = Math.max(1, (int) Math.ceil(w.height() / PATCH_CM));
 			double du = w.width() / nu;
@@ -277,7 +285,8 @@ public final class SunlightCalculator {
 	 * W 창 면적, A 방 전체 표면적, R 평균 반사율 0.5, Rfw 바닥·아래 벽 0.3, Rcw 천장·위 벽 0.7,
 	 * C는 창 앞 가림 각도에 따른 계수(0° 39 → 80° 5).
 	 */
-	private static double internallyReflected(RoomGeom room, ObstructionProfile obstruction) {
+	private static double internallyReflected(RoomGeom room,
+			java.util.function.Function<WindowGeom, ObstructionProfile> obstructionFor) {
 		if (room.windows().isEmpty()) {
 			return 0;
 		}
@@ -286,6 +295,7 @@ public final class SunlightCalculator {
 		for (WindowGeom w : room.windows()) {
 			double a = w.width() * w.height();
 			windowArea += a;
+			ObstructionProfile obstruction = obstructionFor.apply(w);
 			double obs = obstruction == null ? 0 : obstruction.averageAngle(w.azimuthDeg(), 45);
 			weightedC += a * coefficientC(obs);
 		}

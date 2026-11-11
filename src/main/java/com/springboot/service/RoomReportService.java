@@ -167,7 +167,8 @@ public class RoomReportService {
 				windows.add(new String[] { String.valueOf(i++),
 						String.format("%s (%.0f°)", Shape.directionName(w.getAzimuthDeg()), w.getAzimuthDeg()),
 						String.format("%.0f × %.0fcm", w.getWidth(), w.getHeight()), String.format("%.0fcm", w.getSillHeight()),
-						String.format("%.1f°", profile.averageAngle(w.getAzimuthDeg(), 45)) });
+						String.format("%.1f°", obstructionService.windowProfile(house, w.getAzimuthDeg())
+								.averageAngle(w.getAzimuthDeg(), 45)) });
 			}
 			if (room.getWindows().isEmpty()) {
 				pdf.paragraph("등록된 창문이 없습니다.");

@@ -48,7 +48,28 @@
 		return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 	}
 
+	/**
+	 * 동 안 세대 위치 선택칸 채우기. axis = 건물 긴 축 방향(0~180°, 서버 BuildingFacade.longAxis), +1 쪽이 axis 방향 끝.
+	 * 긴 축을 모르면(외곽선 없음) 가운데만.
+	 */
+	function fillUnitPosition(select, axis, value) {
+		const DIRS = ['북', '북동', '동', '남동', '남', '남서', '서', '북서'];
+		const name = (deg) => DIRS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+		const v = value ?? 0;
+		if (axis == null) {
+			select.innerHTML = '<option value="0">가운데 (건물 모양 정보 없음)</option>';
+			select.disabled = true;
+			return;
+		}
+		select.disabled = false;
+		const minus = name(axis + 180), plus = name(axis);
+		const opts = [[-0.85, `${minus}쪽 끝`], [-0.45, `${minus}쪽`], [0, '가운데'], [0.45, `${plus}쪽`], [0.85, `${plus}쪽 끝`]];
+		const nearest = opts.reduce((a, b) => Math.abs(b[0] - v) < Math.abs(a[0] - v) ? b : a)[0];
+		select.innerHTML = opts.map(([p, l]) => `<option value="${p}" ${p === nearest ? 'selected' : ''}>${l}</option>`).join('');
+	}
+
 	window.api = api;
+	window.fillUnitPosition = fillUnitPosition;
 	window.logout = logout;
 	window.escapeHtml = escapeHtml;
 })();

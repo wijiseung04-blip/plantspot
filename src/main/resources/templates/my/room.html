@@ -16,7 +16,7 @@
 				<h2 style="margin-top:0">창문</h2>
 				<div class="table-wrap">
 					<table>
-						<thead><tr><th>벽</th><th>방향</th><th>폭×높이</th><th>창턱</th><th></th></tr></thead>
+						<thead><tr><th>벽</th><th>방향</th><th>폭×높이</th><th>창턱</th><th title="창 바로 앞(우리 동의 우리 세대 위치)에서 본 가림 각도">창 앞 가림</th><th></th></tr></thead>
 						<tbody id="windows"></tbody>
 					</table>
 				</div>
@@ -126,11 +126,17 @@
 					const len = Math.round(Math.hypot(room.shape[(i + 1) % room.shape.length].x - p.x, room.shape[(i + 1) % room.shape.length].y - p.y));
 					return `<option value="${i}">${i}번 벽 · ${DIRS[Math.round(az / 45) % 8]}향 · ${len}cm</option>`;
 				}).join('');
+				let obs = [];
+				try { obs = room.windows.length ? await api(`/api/rooms/${id}/window-obstructions`) : []; } catch (e) { /* 표만 비워 둔다 */ }
+				const obsText = (w) => {
+					const o = obs.find(x => x.windowId === w.id);
+					return o ? `평균 ${o.frontAverage}° · 최대 ${o.frontMax}° (${o.frontMaxAzimuth}°)` : '-';
+				};
 				document.getElementById('windows').innerHTML = room.windows.length ? room.windows.map(w => `
 					<tr><td>${w.wallIndex}</td><td>${escapeHtml(w.direction)} (${w.azimuthDeg}°)</td>
-						<td>${w.width}×${w.height}cm</td><td>${w.sillHeight}cm</td>
+						<td>${w.width}×${w.height}cm</td><td>${w.sillHeight}cm</td><td>${obsText(w)}</td>
 						<td><button class="small danger" data-del="${w.id}">삭제</button></td></tr>`).join('')
-					: '<tr><td colspan="5" class="muted">창문이 없습니다.</td></tr>';
+					: '<tr><td colspan="6" class="muted">창문이 없습니다.</td></tr>';
 				draw(room);
 				const img = document.getElementById('floor-plan');
 				if (room.floorPlanFileId) { img.src = `/api/files/${room.floorPlanFileId}/content?inline=true`; img.style.display = 'block'; }

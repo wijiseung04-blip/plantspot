@@ -65,7 +65,7 @@
 			</div>`;
 			const emit = () => {
 				const b = parcel.find(x => String(x.id) === out.querySelector('input[name=addr-bld]:checked').value);
-				onPick({ buildingId: b.id, dong: b.dong, jibun: b.jibun, height: b.height, groundFloors: b.groundFloors,
+				onPick({ buildingId: b.id, dong: b.dong, jibun: b.jibun, height: b.height, groundFloors: b.groundFloors, axis: b.axis,
 					roadAddress: picked.roadAddress, parcelAddress: picked.parcelAddress });
 			};
 			out.querySelectorAll('input[name=addr-bld]').forEach(r => r.addEventListener('change', emit));

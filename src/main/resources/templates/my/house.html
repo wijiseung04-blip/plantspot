@@ -13,7 +13,7 @@
 		<div class="row">
 			<div class="card" style="max-width:420px"><svg id="skyline" viewBox="-120 -120 240 240" style="width:100%"></svg></div>
 			<div class="card">
-				<p class="muted">우리 층 창 높이에서 본 주변 건물·산의 가림 각도입니다. 가운데가 머리 위(90°), 바깥 원이 지평선(0°)입니다.
+				<p class="muted">우리 층 창 높이, <b>건물 가운데</b>에서 본 주변 건물·산의 가림 각도입니다. 햇빛 계산은 창마다 우리 세대 외벽 바로 앞에서 다시 보며, 방 화면 창문 표에 창별 값이 나옵니다. 가운데가 머리 위(90°), 바깥 원이 지평선(0°)입니다.
 					색칠된 부분이 가려진 하늘입니다. 지형 자료가 있으면 땅 높낮이(경사지 건물, 10km 안의 산)도 반영합니다.</p>
 				<p><span class="badge">건물 데이터</span> 공공 건물 높이로 계산 · <span class="badge" style="background:#8d6e4a;color:#fff">산·지형</span> 고도 자료(Copernicus DEM, Open-Meteo)로 계산 · <span class="badge warn">실측</span> 센서로 보정된 방향</p>
 				<p id="sky-summary" class="muted"></p>
@@ -56,7 +56,9 @@
 				<label>집 이름 <input name="name" required maxlength="40"></label>
 				<label>층 <input name="floor" type="number" min="1" max="80" required></label>
 				<label>층 높이(m) <input name="floorHeight" type="number" min="2.2" max="6" step="0.1"></label>
+				<label title="창별 햇빛 계산의 관측점. 아파트 끝 세대는 옆 동의 영향이 크게 달라집니다">동 안 우리 집 위치 <select name="unitPosition"></select></label>
 			</div>
+			<p class="muted">동 안 위치는 창마다 햇빛을 계산하는 관측점(우리 건물 외벽 바로 앞)을 정합니다. 방 화면에서 창별 가림 각도를 볼 수 있습니다.</p>
 			<button type="submit">저장</button>
 			<button type="button" id="delete-house" class="danger">집 삭제</button>
 		</form>
@@ -74,6 +76,7 @@
 				document.getElementById('info').textContent =
 					`${h.dong} ${h.jibun} · ${h.floor}층 · 건물 높이 ${h.buildingHeight ?? '-'}m (${h.buildingHeightSource ?? '-'}) · 위도 ${h.latitude.toFixed(5)}, 경도 ${h.longitude.toFixed(5)}`;
 				hf.name.value = h.name; hf.floor.value = h.floor; hf.floorHeight.value = h.floorHeight;
+				fillUnitPosition(hf.unitPosition, h.buildingAxis ?? null, h.unitPosition);
 				const rooms = await api(`/api/houses/${id}/rooms`);
 				document.getElementById('rooms').innerHTML = rooms.length ? rooms.map(r => `
 					<a class="card" href="/my/rooms/${r.id}" style="text-decoration:none;color:inherit">
@@ -129,7 +132,8 @@
 				try {
 					await api('/api/houses/' + id, { method: 'PUT', json: {
 						name: hf.name.value, floor: Number(hf.floor.value),
-						floorHeight: hf.floorHeight.value ? Number(hf.floorHeight.value) : null } });
+						floorHeight: hf.floorHeight.value ? Number(hf.floorHeight.value) : null,
+						unitPosition: hf.unitPosition.disabled ? null : Number(hf.unitPosition.value) } });
 					await load(); await loadSky(false);
 				} catch (e) { show(e); }
 			});

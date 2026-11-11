@@ -101,7 +101,7 @@ public class SunlightService {
 	@Transactional
 	public SunlightView forDate(LoginMember me, Long roomId, LocalDate date, boolean calibrated) {
 		Room room = houseService.loadRoom(me, roomId);
-		ObstructionProfile profile = profile(room, calibrated);
+		WindowProfiles profile = profile(room, calibrated);
 		Result r = compute(room, date, profile);
 		return SunlightView.of(room, null, date, calibrated && profile.hasSensorData(), r.cellSize(),
 				r.daylightMinutes(), r.outdoorLux(), windowMinutes(room, r), r.cells(), null);
@@ -119,7 +119,7 @@ public class SunlightService {
 
 	private SunlightView store(Room room, SeasonDay season, int year) {
 		LocalDate date = season.date(year);
-		ObstructionProfile profile = profile(room, true);
+		WindowProfiles profile = profile(room, true);
 		Result r = compute(room, date, profile);
 
 		cells.deleteAll(cells.findByRoomIdAndSeasonAndYearOrderByIyAscIxAsc(room.getId(), season, year));
@@ -138,15 +138,25 @@ public class SunlightService {
 				r.outdoorLux(), windowMinutes(room, r), r.cells(), saved.getComputedAt().toString());
 	}
 
-	private ObstructionProfile profile(Room room, boolean calibrated) {
-		ObstructionProfile p = obstructionService.profile(room.getHouse());
-		return calibrated ? p : p.withoutSensor();
+	/** 창별 가림 각도 (창 id → 프로필). 창마다 우리 건물 외벽의 관측점이 다르다. */
+	private record WindowProfiles(Map<Long, ObstructionProfile> byWindow, boolean hasSensorData) {
 	}
 
-	private Result compute(Room room, LocalDate date, ObstructionProfile profile) {
+	private WindowProfiles profile(Room room, boolean calibrated) {
+		Map<Long, ObstructionProfile> map = new java.util.HashMap<>();
+		boolean sensor = false;
+		for (RoomWindow w : room.getWindows()) {
+			ObstructionProfile p = obstructionService.windowProfile(room.getHouse(), w.getAzimuthDeg());
+			sensor |= p.hasSensorData();
+			map.put(w.getId(), calibrated ? p : p.withoutSensor());
+		}
+		return new WindowProfiles(map, calibrated && sensor);
+	}
+
+	private Result compute(Room room, LocalDate date, WindowProfiles profile) {
 		House h = room.getHouse();
-		return calculator.calculate(geom(room), h.getLatitude(), h.getLongitude(), date, profile,
-				SunlightCalculator.Options.defaults());
+		return calculator.calculatePerWindow(geom(room), h.getLatitude(), h.getLongitude(), date,
+				w -> profile.byWindow().get(w.id()), SunlightCalculator.Options.defaults());
 	}
 
 	public static RoomGeom geom(Room room) {

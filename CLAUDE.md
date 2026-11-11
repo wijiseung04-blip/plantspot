@@ -46,7 +46,7 @@ src/main/java/com/springboot
 ├── repository/   (퍼시스턴트) Spring Data JPA 리포지토리
 ├── domain/       JPA 엔티티·enum (Member, Building, House, Room, RoomWindow, PlantSpecies, SunlightCell …)
 ├── dto/          요청·응답 객체 (HouseRequests, HouseResponses, SignupForm …)
-├── calculator/   계산 로직 (SolarCalculator, ObstructionCalculator, SunlightCalculator, PlantScorer, TmConverter …)
+├── calculator/   계산 로직 (SolarCalculator, ObstructionCalculator, BuildingFacade, TerrainCalculator, SunlightCalculator, PlantScorer, TmConverter …)
 ├── client/       외부 API 호출 (농사로·천문연·기상청·브이월드·Open-Meteo 고도)
 ├── report/       PDF·PNG 만들기 (PdfWriter, RoomPlanRenderer, KoreanFont)
 ├── tool/         ① 데이터 생성 프로그램 (BuildingImporter, PlantImportRunner, WeatherCollectRunner, TerrainImportRunner, GpkgGeometryReader)
@@ -75,7 +75,7 @@ data/plantspot.db  DB 파일 (처음 실행할 때 자동 생성, 테이블은 J
 
 ## 4. 현재 코드 상태 (아두이노 전까지 구현)
 
-빌드·테스트: `./gradlew build` (단위·API·화면 테스트 157개). 서버를 실행해 브라우저로도 확인함.
+빌드·테스트: `./gradlew build` (단위·API·화면 테스트 165개). 서버를 실행해 브라우저로도 확인함.
 테스트도 같은 계층 패키지(`src/test/java/com/springboot/controller|service|calculator|client|tool`, 공용 도구는 `support`).
 `src/test/js/editor-parity.js`: 브라우저 JS와 서버 계산 일치 확인 (node 로 실행)
 
@@ -131,6 +131,13 @@ API 키·관리자 비밀번호는 `src/main/resources/application-local.propert
 - **도로명주소(또는 지번주소) 검색**: `GET /api/address/search?query=` → 브이월드 검색 API(도로명, 없으면 지번) → 좌표(EPSG:5186) → building 외곽선 안의 건물, 없으면 30m 안 가장 가까운 건물 → 그 건물의 동·지번 (`address/AddressService`, 화면 `static/js/address.js`)
 - **동 선택 + 지번 입력** → building 테이블 검색 (주소 검색 키가 없을 때도 동작)
 - 건물명 검색은 건물명이 비어 있는 경우가 많아 쓰지 않음
+
+### 5-1-0. 창별 관측점 (동 안 세대 위치)
+- 집 `unit_position`(−1~1): 건물 긴 축(외곽선을 감싸는 최소 사각형의 긴 변, 0~180°)을 따라 우리 세대 위치. +1 = 긴 축 방향 끝 (예: 축 90° → 동쪽 끝)
+- 창마다 관측점 = 세대 위치에서 창 방향으로 나가 처음 만나는 우리 건물 외벽 + 0.5m (`BuildingFacade`). 외곽선 없으면 건물 중심
+- 햇빛 계산(SunlightService)·리포트·비회원 예측은 창별 관측점 값, 집 화면 스카이라인은 건물 가운데 기준(센서 실측은 집 단위로 모든 창에 적용)
+- 방 화면 창문 표: `GET /api/rooms/{id}/window-obstructions` (창 앞 ±45° 평균, ±85° 안 최대)
+- 화면 선택: 끝(±0.85)·중간(±0.45)·가운데, 이름은 긴 축 방향으로 "동쪽 끝/서쪽" 등
 
 ### 5-1-1. 지형 (땅 높낮이)
 - `importTerrain`: 건물 범위 + 5km 를 90m 격자(약 4~5만 점)로 나눠 100점씩 고도 API 호출 → `terrain_grid`·`terrain_point`

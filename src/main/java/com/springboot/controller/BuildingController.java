@@ -62,13 +62,14 @@ public class BuildingController {
 
 	public record BuildingResponse(Long id, String dong, String jibun, String buildingName, String dongLabel, String usage,
 			Integer groundFloors, double height, HeightSource heightSource, double area, double x, double y,
-			double latitude, double longitude) {
+			double latitude, double longitude, Double axis) {
 
 		static BuildingResponse of(Building b) {
+			double axis = com.springboot.calculator.BuildingFacade.longAxis(b.getFootprintWkt());
 			return new BuildingResponse(b.getId(), b.getDong(), b.getJibun(), b.getBuildingName(), b.getDongLabel(), b.getUsage(),
 					b.getGroundFloors(), b.getHeight(), b.getHeightSource(), round(b.getArea()), round(b.getCenterX()),
 					round(b.getCenterY()), Math.round(b.getLatitude() * 1e6) / 1e6,
-					Math.round(b.getLongitude() * 1e6) / 1e6);
+					Math.round(b.getLongitude() * 1e6) / 1e6, Double.isNaN(axis) ? null : axis);
 		}
 	}
 
