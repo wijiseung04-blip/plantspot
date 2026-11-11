@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.springboot.domain.Building;
 import com.springboot.exception.ForbiddenException;
 import com.springboot.exception.NotFoundException;
+import com.springboot.dto.HouseRequests;
 import com.springboot.dto.HouseRequests.CreateHouse;
 import com.springboot.dto.HouseRequests.SaveRoom;
 import com.springboot.dto.HouseRequests.SaveWindow;
@@ -44,6 +45,8 @@ public class HouseService {
 	public static final double DEFAULT_CEILING_HEIGHT = 230;
 	/** 방 최소 넓이 1㎡ (cm²) */
 	private static final double MIN_ROOM_AREA = 10_000;
+	/** 안쪽 창 기본 투과율 (유리 한 겹) */
+	public static final double DEFAULT_INNER_GLASS = 0.75;
 
 	private final HouseRepository houses;
 	private final RoomRepository rooms;
@@ -162,6 +165,11 @@ public class HouseService {
 		if (req.winterMinTemp() != null) {
 			room.changeWinterMinTemp(req.winterMinTemp());
 		}
+		// 벽이 줄어 안쪽 창 선의 벽이 없어지거나 방 깊이보다 멀어지면 지운다
+		if (room.hasInnerGlass() && (room.getInnerGlassWall() >= req.shape().size()
+				|| room.getInnerGlassDistance() >= depthFrom(req.shape(), room.getInnerGlassWall()))) {
+			room.clearInnerGlass();
+		}
 		// 모양이 바뀌어도 기존 창문이 벽 안에 들어가는지 다시 확인하고 방향을 다시 계산
 		for (RoomWindow w : room.getWindows()) {
 			validateWindow(room, w.getWallIndex(), w.getOffset(), w.getWidth(), w.getHeight(), w.getSillHeight());
@@ -176,6 +184,46 @@ public class HouseService {
 		Room room = loadRoom(me, roomId);
 		events.publishEvent(new HouseEvents.RoomDeleting(roomId));
 		room.getHouse().getRooms().remove(room);
+	}
+
+	/** 안쪽 창 선 저장 (발코니와 거실 사이 유리창). 벽 번호와 방 깊이를 확인한다. */
+	@Transactional
+	public RoomResponse setInnerGlass(LoginMember me, Long roomId, HouseRequests.SaveInnerGlass req) {
+		Room room = loadRoom(me, roomId);
+		List<Point> pts = room.points();
+		if (req.wallIndex() >= pts.size()) {
+			throw new IllegalArgumentException("벽 번호가 잘못되었습니다 (0~" + (pts.size() - 1) + ").");
+		}
+		double depth = depthFrom(pts, req.wallIndex());
+		if (req.distance() >= depth) {
+			throw new IllegalArgumentException(String.format("안쪽 창은 방 깊이(%.0fcm)보다 가까워야 합니다.", depth));
+		}
+		room.setInnerGlass(req.wallIndex(), req.distance(),
+				req.transmittance() != null ? req.transmittance() : DEFAULT_INNER_GLASS);
+		events.publishEvent(new HouseEvents.RoomChanged(roomId));
+		log.info("안쪽 창 선: 방 {} 벽 {} 에서 {}cm", roomId, req.wallIndex(), req.distance());
+		return RoomResponse.of(room);
+	}
+
+	@Transactional
+	public RoomResponse clearInnerGlass(LoginMember me, Long roomId) {
+		Room room = loadRoom(me, roomId);
+		room.clearInnerGlass();
+		events.publishEvent(new HouseEvents.RoomChanged(roomId));
+		return RoomResponse.of(room);
+	}
+
+	/** 벽(wallIndex)에서 방 안쪽으로 가장 먼 꼭짓점까지 거리(cm) = 그 벽 기준 방 깊이. */
+	static double depthFrom(List<Point> pts, int wallIndex) {
+		Point a = pts.get(wallIndex);
+		Point b = pts.get((wallIndex + 1) % pts.size());
+		double len = Math.hypot(b.x() - a.x(), b.y() - a.y());
+		double max = 0;
+		for (Point p : pts) {
+			double cross = ((b.x() - a.x()) * (p.y() - a.y()) - (b.y() - a.y()) * (p.x() - a.x())) / len;
+			max = Math.max(max, Math.abs(cross));
+		}
+		return max;
 	}
 
 	@Transactional

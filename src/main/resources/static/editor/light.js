@@ -135,6 +135,28 @@
 		return 'DIM';
 	}
 
+	/** 안쪽 창 선(발코니 + 거실): 벽에서 방 안쪽으로 distance 보다 먼 점이면 그 투과율, 아니면 1 — 서버 innerGlassFactor 와 같음 */
+	function innerGlassFactor(room, p) {
+		const g = room.innerGlass;
+		if (!g || g.wallIndex < 0 || g.wallIndex >= room.points.length) return 1;
+		const a = room.points[g.wallIndex], b = room.points[(g.wallIndex + 1) % room.points.length];
+		const len = Math.hypot(b.x - a.x, b.y - a.y);
+		if (!len) return 1;
+		const d = Math.abs(((b.x - a.x) * (p[1] - a.y) - (b.y - a.y) * (p[0] - a.x)) / len);
+		return d > g.distance ? g.transmittance : 1;
+	}
+
+	/** 안쪽 창 선을 그릴 두 점 (벽과 나란히, 방 안쪽으로 distance) */
+	function innerGlassLine(points, g) {
+		if (!g || g.wallIndex < 0 || g.wallIndex >= points.length) return null;
+		const a = points[g.wallIndex], b = points[(g.wallIndex + 1) % points.length];
+		const len = Math.hypot(b.x - a.x, b.y - a.y);
+		if (!len) return null;
+		const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, s = signedArea(points) > 0 ? 1 : -1;
+		const nx = -uy * s, ny = ux * s; // 방 안쪽
+		return [{ x: a.x + nx * g.distance, y: a.y + ny * g.distance }, { x: b.x + nx * g.distance, y: b.y + ny * g.distance }];
+	}
+
 	/** 점들의 하루 직사광(분)과 하늘빛 lux */
 	function dayAt(room, points, dateStr, lat, lon, obs, opt = {}) {
 		const step = opt.step || 15, work = opt.workHeight || 0;
@@ -155,7 +177,7 @@
 		const out = outdoorLux(dateStr, lat, lon), irc = internallyReflected(room, geoms, obs);
 		const tr = GLASS * (room.curtainT ?? 1);
 		return points.map((p, i) => {
-			const lux = (skyComponent(room, geoms, p, obs, work) + irc) * tr * out;
+			const lux = (skyComponent(room, geoms, p, obs, work) + irc) * tr * innerGlassFactor(room, p) * out;
 			let dist = Infinity;
 			geoms.forEach(g => {
 				const vx = g.ex - g.sx, vy = g.ey - g.sy, t = Math.max(0, Math.min(1, ((p[0] - g.sx) * vx + (p[1] - g.sy) * vy) / (vx * vx + vy * vy)));
@@ -194,5 +216,5 @@
 		return Math.round(100 * light * direct * (1 - 0.3 * Math.min(1, gap / 150)));
 	}
 
-	global.Light = { windowGeom, sunPatch, dayAt, cellCenters, plantScore, signedArea, inside, obstructionAt, norm360 };
+	global.Light = { innerGlassFactor, innerGlassLine, windowGeom, sunPatch, dayAt, cellCenters, plantScore, signedArea, inside, obstructionAt, norm360 };
 })(window);

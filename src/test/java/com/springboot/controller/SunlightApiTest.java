@@ -132,4 +132,37 @@ class SunlightApiTest {
 		assertThat(jdbc.queryForObject("select count(*) from sunlight_summary", Integer.class)).isZero();
 	}
 
+
+	@Test
+	void 안쪽_창_선을_저장하면_거실_칸만_어두워진다() throws Exception {
+		String before = mvc.perform(get(room + "/sunlight").param("season", "WINTER_SOLSTICE").param("year", "2026")
+				.with(user(owner))).andReturn().getResponse().getContentAsString();
+		mvc.perform(put(room + "/inner-glass").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"wallIndex\":2,\"distance\":100}").with(csrf()).with(user(owner)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.innerGlass.wallIndex").value(2))
+				.andExpect(jsonPath("$.innerGlass.distance").value(100.0))
+				.andExpect(jsonPath("$.innerGlass.transmittance").value(0.75));
+		String after = mvc.perform(get(room + "/sunlight").param("season", "WINTER_SOLSTICE").param("year", "2026")
+				.with(user(owner))).andReturn().getResponse().getContentAsString();
+		// 첫 칸(y=12.5, 남쪽 벽에서 287.5cm)은 거실 쪽 → 0.75배, 마지막 칸(남쪽 벽 바로 앞)은 발코니 → 그대로
+		double b0 = com.jayway.jsonpath.JsonPath.<Number>read(before, "$.cells[0].lux").doubleValue();
+		double a0 = com.jayway.jsonpath.JsonPath.<Number>read(after, "$.cells[0].lux").doubleValue();
+		org.assertj.core.api.Assertions.assertThat(a0).isCloseTo(b0 * 0.75, org.assertj.core.api.Assertions.within(1.5));
+		double bl = com.jayway.jsonpath.JsonPath.<Number>read(before, "$.cells[-1].lux").doubleValue();
+		double al = com.jayway.jsonpath.JsonPath.<Number>read(after, "$.cells[-1].lux").doubleValue();
+		org.assertj.core.api.Assertions.assertThat(al).isEqualTo(bl);
+
+		// 방 깊이(300cm) 이상이거나 없는 벽이면 400
+		mvc.perform(put(room + "/inner-glass").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"wallIndex\":2,\"distance\":300}").with(csrf()).with(user(owner)))
+				.andExpect(status().isBadRequest());
+		mvc.perform(put(room + "/inner-glass").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"wallIndex\":9,\"distance\":100}").with(csrf()).with(user(owner)))
+				.andExpect(status().isBadRequest());
+		// 지우기
+		mvc.perform(delete(room + "/inner-glass").with(csrf()).with(user(owner)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.innerGlass").doesNotExist());
+	}
 }

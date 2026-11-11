@@ -37,7 +37,7 @@
 
 	function room() {
 		return { points: state.points, orientationDeg: state.orientationDeg, ceilingHeight: state.ceilingHeight,
-			curtainT: state.curtainT, windows: state.windows };
+			curtainT: state.curtainT, windows: state.windows, innerGlass: state.innerGlass || null };
 	}
 
 	/** 쓰는 가림 각도: 서버 자료(건물+실측) 또는 '앞 건물 각도' 직접 입력 */
@@ -134,6 +134,13 @@
 					ctx.strokeStyle = accent; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
 				}
 			});
+			// 안쪽 창 선 (발코니 + 거실, 방 화면에서 정함)
+			const ig = Light.innerGlassLine(state.points, state.innerGlass);
+			if (ig) {
+				const [ax, ay] = toScreen(ig[0].x, ig[0].y), [bx, by] = toScreen(ig[1].x, ig[1].y);
+				ctx.setLineDash([8, 5]); ctx.strokeStyle = '#4aa3df'; ctx.lineWidth = 3;
+				ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.setLineDash([]);
+			}
 			// 창문
 			geoms.forEach((g, i) => {
 				const [ax, ay] = toScreen(g.sx, g.sy), [bx, by] = toScreen(g.ex, g.ey);
@@ -193,7 +200,7 @@
 
 	function recompute() {
 		const key = JSON.stringify([state.points, state.windows, state.orientationDeg, state.curtainT, state.date, state.lat, state.lon,
-			state.frontObstruction, state.obstruction, state.sensor, state.ceilingHeight, state.workHeight]);
+			state.frontObstruction, state.obstruction, state.sensor, state.ceilingHeight, state.workHeight, state.innerGlass]);
 		if (key === heatKey) return;
 		heatKey = key;
 		if (state.points.length < 3) { heat = null; return; }
@@ -518,7 +525,7 @@
 			points: r.shape.map(p => ({ x: p.x, y: p.y })),
 			windows: r.windows.map(w => ({ id: w.id, wallIndex: w.wallIndex, offset: w.offset, width: w.width, height: w.height, sill: w.sillHeight })),
 			lat: house.latitude, lon: house.longitude, obstruction: obs.map(b => b.buildingAngle), sensor: obs.map(b => b.sensorAngle ?? null),
-			serverCurtain: r.curtain };
+			serverCurtain: r.curtain, innerGlass: r.innerGlass || null };
 		try {
 			const mine = await api('/api/my-plants');
 			state.plants = [];

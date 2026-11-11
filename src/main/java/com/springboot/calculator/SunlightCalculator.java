@@ -53,7 +53,40 @@ public final class SunlightCalculator {
 	}
 
 	public record RoomGeom(List<Point> polygon, double orientationDeg, double ceilingHeight, List<WindowGeom> windows,
-			double curtainTransmittance) {
+			double curtainTransmittance, InnerGlass innerGlass) {
+
+		public RoomGeom(List<Point> polygon, double orientationDeg, double ceilingHeight, List<WindowGeom> windows,
+				double curtainTransmittance) {
+			this(polygon, orientationDeg, ceilingHeight, windows, curtainTransmittance, null);
+		}
+
+		public RoomGeom withInnerGlass(InnerGlass g) {
+			return new RoomGeom(polygon, orientationDeg, ceilingHeight, windows, curtainTransmittance, g);
+		}
+	}
+
+	/**
+	 * 안쪽 창 선 (발코니 + 거실): 벽 wallIndex 에서 방 안쪽으로 distance(cm)에 유리가 한 겹 더 있다.
+	 * 그 선보다 안쪽 칸의 하늘빛(lux)에 transmittance 를 곱한다. 직사광 시간은 유리를 지나도 그대로라 바꾸지 않는다.
+	 */
+	public record InnerGlass(int wallIndex, double distance, double transmittance) {
+	}
+
+	/** 칸 p 가 안쪽 창 선보다 안쪽이면 그 투과율, 아니면 1. */
+	static double innerGlassFactor(RoomGeom room, double[] p) {
+		InnerGlass g = room.innerGlass();
+		if (g == null || g.wallIndex() < 0 || g.wallIndex() >= room.polygon().size()) {
+			return 1;
+		}
+		Point a = room.polygon().get(g.wallIndex());
+		Point b = room.polygon().get((g.wallIndex() + 1) % room.polygon().size());
+		double len = Math.hypot(b.x() - a.x(), b.y() - a.y());
+		if (len == 0) {
+			return 1;
+		}
+		// 벽에서 방 안쪽으로 잰 거리 (다각형 방향과 상관없이 절댓값)
+		double d = Math.abs(((b.x() - a.x()) * (p[1] - a.y()) - (b.y() - a.y()) * (p[0] - a.x())) / len);
+		return d > g.distance() ? g.transmittance() : 1;
 	}
 
 	/** 방 다각형과 창 정보로 RoomGeom을 만든다. windows의 각 원소: {id, wallIndex, offset, width, height, sill, azimuth}. */
@@ -157,7 +190,8 @@ public final class SunlightCalculator {
 		double minY = room.polygon().stream().mapToDouble(Point::y).min().orElse(0);
 		for (int c = 0; c < n; c++) {
 			double[] p = centers.get(c);
-			double df = (skyComponent(room, p, obstructionFor, opt.workHeight()) + irc) * transmit;
+			double df = (skyComponent(room, p, obstructionFor, opt.workHeight()) + irc) * transmit
+					* innerGlassFactor(room, p);
 			double lux = df * outdoorLux;
 			int ix = (int) Math.floor((p[0] - minX) / opt.cellSize());
 			int iy = (int) Math.floor((p[1] - minY) / opt.cellSize());

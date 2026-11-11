@@ -164,8 +164,10 @@ public class SunlightService {
 				.map(w -> new double[] { w.getId(), w.getWallIndex(), w.getOffset(), w.getWidth(), w.getHeight(),
 						w.getSillHeight(), w.getAzimuthDeg() })
 				.toList();
-		return SunlightCalculator.room(room.points(), room.getOrientationDeg(), room.getCeilingHeight(), ws,
+		RoomGeom g = SunlightCalculator.room(room.points(), room.getOrientationDeg(), room.getCeilingHeight(), ws,
 				room.getCurtain().getTransmittance());
+		return room.hasInnerGlass() ? g.withInnerGlass(new SunlightCalculator.InnerGlass(room.getInnerGlassWall(),
+				room.getInnerGlassDistance(), room.getInnerGlassTransmittance())) : g;
 	}
 
 	private static List<WindowSun> windowMinutes(Room room, Result r) {

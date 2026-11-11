@@ -99,6 +99,18 @@ public class HouseApiController {
 
 	// ----- 창문 -----
 
+	/** 안쪽 창 선 (발코니 + 거실처럼 창이 두 겹인 방) */
+	@PutMapping("/api/rooms/{id}/inner-glass")
+	public RoomResponse setInnerGlass(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
+			@Valid @RequestBody com.springboot.dto.HouseRequests.SaveInnerGlass req) {
+		return service.setInnerGlass(me, id, req);
+	}
+
+	@DeleteMapping("/api/rooms/{id}/inner-glass")
+	public RoomResponse clearInnerGlass(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id) {
+		return service.clearInnerGlass(me, id);
+	}
+
 	@PostMapping("/api/rooms/{id}/windows")
 	public ResponseEntity<WindowResponse> createWindow(@AuthenticationPrincipal LoginMember me, @PathVariable("id") Long id,
 			@Valid @RequestBody SaveWindow req) {

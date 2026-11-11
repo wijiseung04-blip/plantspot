@@ -60,6 +60,19 @@ public class Room {
 	private Double winterMinTemp;
 
 	/** 평면도 이미지(업로드 파일) 번호, 없으면 null */
+	/**
+	 * 안쪽 창 선 (발코니 + 거실처럼 창이 두 겹인 방): 벽 inner_glass_wall 에서 방 안쪽으로 inner_glass_distance(cm)에
+	 * 유리 한 겹이 더 있다. 그 선보다 안쪽 칸은 하늘빛에 inner_glass_transmittance 를 한 번 더 곱한다. 없으면 null.
+	 */
+	@Column(name = "inner_glass_wall")
+	private Integer innerGlassWall;
+
+	@Column(name = "inner_glass_distance")
+	private Double innerGlassDistance;
+
+	@Column(name = "inner_glass_transmittance")
+	private Double innerGlassTransmittance;
+
 	@Column(name = "floor_plan_file_id")
 	private Long floorPlanFileId;
 
@@ -83,6 +96,34 @@ public class Room {
 		this.orientationDeg = Shape.normalize(orientationDeg);
 		this.ceilingHeight = ceilingHeight;
 		this.curtain = curtain;
+	}
+
+	public void setInnerGlass(int wallIndex, double distance, double transmittance) {
+		this.innerGlassWall = wallIndex;
+		this.innerGlassDistance = distance;
+		this.innerGlassTransmittance = transmittance;
+	}
+
+	public void clearInnerGlass() {
+		this.innerGlassWall = null;
+		this.innerGlassDistance = null;
+		this.innerGlassTransmittance = null;
+	}
+
+	public boolean hasInnerGlass() {
+		return innerGlassWall != null && innerGlassDistance != null && innerGlassTransmittance != null;
+	}
+
+	public Integer getInnerGlassWall() {
+		return innerGlassWall;
+	}
+
+	public Double getInnerGlassDistance() {
+		return innerGlassDistance;
+	}
+
+	public Double getInnerGlassTransmittance() {
+		return innerGlassTransmittance;
 	}
 
 	public void changeWinterMinTemp(Double celsius) {
