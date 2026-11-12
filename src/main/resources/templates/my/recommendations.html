@@ -96,7 +96,27 @@
 					marks: spots.map(s => ({ x: s.x, y: s.y, label: '추천 자리', text: '★', color: 'var(--accent)' }))
 				});
 				document.getElementById('fit-title').textContent = `${fit.name} · ${Math.round(fit.score)}점 · 잘 맞는 자리 ${fit.roomyPercent}%`;
-				document.getElementById('fit-notes').innerHTML = fit.notes.map(n => `<p class="muted">⚠ ${escapeHtml(n)}</p>`).join('');
+				document.getElementById('fit-notes').innerHTML = breakdownHtml(fit)
+					+ fit.notes.map(n => `<p class="muted">⚠ ${escapeHtml(n)}</p>`).join('');
+			}
+
+			/** 점수 내역: 추천 자리의 계절별 빛·직사광·창 거리와 종합 점수 계산 */
+			function breakdownHtml(f) {
+				const b = f && f.breakdown;
+				if (!b || !b.seasons.length) return '';
+				const pct = (v) => `<td class="${v < 70 ? 'err' : v < 90 ? 'warn' : ''}">${v}%</td>`; // 90% 이상은 거의 감점 없음
+				const fixed = f.type === 'FIXED';
+				const one = (v) => (Math.round(v * 10) / 10).toString();
+				return `<h3>점수 내역</h3>
+					<p class="muted">${fixed ? '1년 내내 같은 추천 자리' : '계절마다 옮기는 추천 자리'}의 항목별 점수입니다. 100%면 감점 없음, 90% 미만은 주황·70% 미만은 빨강.</p>
+					<div class="table-wrap"><table class="breakdown">
+						<tr><th>계절</th><th title="하늘빛 밝기가 식물 lux 범위 가운데에 가까울수록 높음">빛</th>
+							<th title="직사광 시간이 식물에 맞는지">직사광</th><th title="농사로 추천 배치 거리에 맞는지">창 거리</th><th>칸 점수</th></tr>
+						${b.seasons.map(s => `<tr><th>${escapeHtml(s.label)}</th>${pct(s.light)}${pct(s.direct)}${pct(s.distance)}<td><strong>${Math.round(s.score)}</strong></td></tr>`).join('')}
+					</table></div>
+					<p class="muted">자리 점수 ${one(b.spotScore)}${fixed ? ' (계절 최저 60% + 평균 40%)' : ' (계절별 칸 점수 평균 × 0.9, 옮기는 수고)'}
+						× 0.9 + 자리 여유 ${one(b.roomyBonus)}${b.temperatureFactor < 1 ? ` → 겨울 온도 × ${b.temperatureFactor}` : ''}
+						= <strong>${Math.round(b.total)}점</strong></p>`;
 			}
 
 			async function load(refresh) {
@@ -115,7 +135,7 @@
 
 			// ----- 상세 정보 팝업 -----
 			const popup = document.getElementById('plant-popup');
-			async function openPopup(plantId) {
+			async function openPopup(plantId, fitReady) {
 				const rec = data.items.find(p => p.plantId === plantId);
 				const body = document.getElementById('popup-body');
 				body.innerHTML = '<p class="muted">불러오는 중…</p>';
@@ -147,8 +167,12 @@
 							<tr><th>물주기</th><td>${water}</td></tr>
 							<tr><th>추천 기준(변환값)</th><td>${p.minLux.toLocaleString()} ~ ${p.maxLux.toLocaleString()} lux${p.minWindowDistance != null ? ` · 창에서 ${p.minWindowDistance} ~ ${p.maxWindowDistance}cm` : ''}</td></tr>
 						</table></div>
+						<div id="popup-breakdown"></div>
 						${rec && rec.notes.length ? rec.notes.map(n => `<p class="muted">⚠ ${e(n)}</p>`).join('') : ''}
 						${p.advice ? `<h3>관리 요령</h3><p>${e(p.advice)}</p>` : ''}`;
+					await fitReady;
+					const box = document.getElementById('popup-breakdown');
+					if (box && fit && fit.plantId === plantId) box.innerHTML = breakdownHtml(fit);
 				} catch (err) { body.innerHTML = `<p class="flash err">${escapeHtml(err.message)}</p>`; }
 			}
 			function closePopup() { if (typeof popup.close === 'function') popup.close(); else popup.removeAttribute('open'); }
@@ -161,8 +185,8 @@
 				const card = ev.target.closest('[data-plant]');
 				if (!card) return;
 				const plantId = Number(card.dataset.plant);
-				openPopup(plantId);
-				select(plantId).catch(show);
+				const ready = select(plantId).catch(show);
+				openPopup(plantId, ready);
 			});
 			document.getElementById('levels').addEventListener('click', (ev) => {
 				if (ev.target.tagName !== 'A') return;

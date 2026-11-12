@@ -27,8 +27,44 @@ class PlantScorerTest {
 	}
 
 	@Test
-	void 범위_안이면_100점() {
-		assertThat(PlantScorer.score(plant(800, 1500, 0, 180, null, null, null), cell(1000, 60, 100))).isEqualTo(100.0);
+	void 범위_가운데면_100점_가운데서_멀어지면_곡선으로_감점() {
+		PlantSpecies mid = plant(800, 1500, 0, 180, null, null, null);
+		assertThat(PlantScorer.score(mid, cell(1095, 60, 100))).isEqualTo(100.0); // 로그 눈금 가운데
+		// 예전에는 가운데 절반(약 935~1280 lux)이 모두 100점이었다
+		assertThat(PlantScorer.score(mid, cell(1000, 60, 100))).isEqualTo(98.3);
+		assertThat(PlantScorer.score(mid, cell(950, 60, 100))).isEqualTo(95.9);
+		assertThat(PlantScorer.score(mid, cell(1250, 60, 100))).isEqualTo(96.5);
+	}
+
+	@Test
+	void 범위가_비슷한_식물도_점수가_갈린다() {
+		PlantSpecies a = plant(800, 1500, 0, 180, null, null, null);
+		PlantSpecies b = plant(800, 1800, 0, 180, null, null, null);
+		Cell c = cell(1000, 0, 100);
+		assertThat(PlantScorer.score(a, c)).isNotEqualTo(PlantScorer.score(b, c));
+	}
+
+	@Test
+	void 항목별_점수를_곱하면_칸_점수() {
+		PlantSpecies p = plant(300, 10000, 0, null, 0, 50, null);
+		PlantScorer.Parts parts = PlantScorer.parts(p, cell(1700, 0, 125));
+		assertThat(parts.distance()).isEqualTo(0.85);
+		assertThat(parts.score()).isEqualTo(Math.round(1000 * parts.light() * parts.direct() * parts.distance()) / 10.0);
+	}
+
+	@Test
+	void 점수_내역은_종합_점수_계산과_같다() {
+		PlantSpecies p = plant(800, 1500, 0, 180, null, null, 13);
+		List<Cell> cells = List.of(cell(1000, 0, 100), cell(200, 0, 300));
+		var r = PlantScorer.evaluate(p, seasons(cells, cells, cells, cells), 8.0);
+		var b = r.breakdown();
+		assertThat(b.seasons()).hasSize(4);
+		assertThat(b.seasons().get(0).parts().score()).isEqualTo(98.3);
+		assertThat(b.spotScore()).isEqualTo(98.3);
+		assertThat(b.roomyBonus()).isEqualTo(5.0); // 2칸 중 1칸
+		assertThat(b.temperatureFactor()).isEqualTo(0.7);
+		assertThat(b.total()).isEqualTo(r.score());
+		assertThat(b.total()).isCloseTo((b.spotScore() * 0.9 + b.roomyBonus()) * b.temperatureFactor(), org.assertj.core.data.Offset.offset(0.2));
 	}
 
 	@Test
@@ -44,7 +80,7 @@ class PlantScorerTest {
 	@Test
 	void 범위_끝으로_갈수록_조금씩_감점() {
 		PlantSpecies mid = plant(800, 1500, 0, 180, null, null, null);
-		assertThat(PlantScorer.score(mid, cell(1100, 0, 100))).isEqualTo(100.0); // 가운데
+		assertThat(PlantScorer.score(mid, cell(1095, 0, 100))).isEqualTo(100.0); // 가운데
 		assertThat(PlantScorer.score(mid, cell(800, 0, 100))).isEqualTo(80.0); // 범위 끝
 		assertThat(PlantScorer.score(mid, cell(850, 0, 100))).isBetween(80.0, 100.0);
 		assertThat(PlantScorer.score(mid, cell(700, 0, 100))).isLessThan(80); // 범위 밖은 더 낮다

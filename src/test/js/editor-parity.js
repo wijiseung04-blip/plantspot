@@ -45,6 +45,12 @@ for (const [date, rows] of Object.entries(server)) {
 		check(`안쪽 창 · 창에서 ${r[0]}cm 직사광(분)`, cells[i].directMinutes, r[2], 0);
 	});
 }
+// 식물 점수 — 서버 PlantScorerTest 와 같은 값 (브라우저는 정수로 반올림)
+{
+	const mid = { minLux: 800, maxLux: 1500, minDirectMinutes: 0, maxDirectMinutes: 180, minWindowDistance: null, maxWindowDistance: null };
+	[[1095, 100], [1000, 98], [950, 96], [1250, 97], [800, 80]].forEach(([lux, exp]) =>
+		check(`식물 점수 800~1500 lux · ${lux} lux`, Light.plantScore(mid, { lux, directMinutes: 0, distance: 100 }), exp, 0));
+}
 if (failed) {
 	console.error(`${failed}개 불일치`);
 	process.exit(1);

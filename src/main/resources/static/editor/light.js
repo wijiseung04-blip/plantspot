@@ -197,7 +197,6 @@
 		return out;
 	}
 
-	/** 식물 점수 — 서버 PlantScorer.score 와 같은 식 */
 	/** 서버 PlantScorer.score 와 같은 식 */
 	function plantScore(p, c) {
 		const EDGE = 0.8;
@@ -206,14 +205,16 @@
 		else if (c.lux > p.maxLux) light = EDGE * Math.pow(p.maxLux / c.lux, 0.5);
 		else if (p.maxLux > p.minLux) {
 			const t = Math.log(c.lux / p.minLux) / Math.log(p.maxLux / p.minLux);
-			light = 1 - (1 - EDGE) * Math.max(0, Math.abs(t - 0.5) - 0.25) / 0.25;
+			const off = 2 * Math.abs(t - 0.5);
+			light = 1 - (1 - EDGE) * off * off;
 		}
 		let direct = 1;
 		if (p.minDirectMinutes > 0 && c.directMinutes < p.minDirectMinutes) direct = 0.3 + 0.7 * c.directMinutes / p.minDirectMinutes;
 		if (p.maxDirectMinutes != null && c.directMinutes > p.maxDirectMinutes) direct *= Math.pow(Math.max(p.maxDirectMinutes, 15) / c.directMinutes, 0.7);
 		const gap = p.minWindowDistance == null || p.maxWindowDistance == null ? 0
 			: Math.max(0, p.minWindowDistance - c.distance, c.distance - p.maxWindowDistance);
-		return Math.round(100 * light * direct * (1 - 0.3 * Math.min(1, gap / 150)));
+		// 서버처럼 소수 한 자리로 먼저 반올림한 뒤 정수로 (96.48 → 96.5 → 97)
+		return Math.round(Math.round(1000 * light * direct * (1 - 0.3 * Math.min(1, gap / 150))) / 10);
 	}
 
 	global.Light = { innerGlassFactor, innerGlassLine, windowGeom, sunPatch, dayAt, cellCenters, plantScore, signedArea, inside, obstructionAt, norm360 };

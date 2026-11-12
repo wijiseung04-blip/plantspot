@@ -12,11 +12,13 @@ import com.springboot.calculator.SunlightCalculator.Cell;
 /**
  * 식물 적합도 점수(0~100). [① 분석 후 저장: 칸별 햇빛 + 식물 변환값 → 추천]
  * <ul>
- * <li>하늘빛 조도: 식물 lux 범위를 로그 눈금으로 4등분해 가운데 절반이면 1, 범위 끝으로 갈수록 0.8까지.
+ * <li>하늘빛 조도: 식물 lux 범위 안 위치(로그 눈금 0~1)가 가운데(0.5)면 1, 멀어질수록 곡선으로 줄어 범위 끝에서 0.8.
+ * 1 − 0.2 × (2|t − 0.5|)². 계단이 없어 범위가 비슷한 식물끼리도 점수가 갈린다.
  * 범위 밖은 0.8에서 더 줄어든다 (모자라면 ×(lux/최소)^0.7, 넘치면 ×(최대/lux)^0.5)</li>
  * <li>직사광: 최소보다 적으면 비율만큼, 최대보다 많으면 (최대/직사광)^0.7</li>
  * <li>창에서 거리: 농사로 배치장소 범위에서 벗어난 거리만큼 감점 (150cm 이상 벗어나면 0.7)</li>
  * </ul>
+ * 칸 점수 = 100 × 빛 × 직사광 × 창 거리 ({@link #parts}로 항목별 값을 화면에 보여 준다).
  * 방 점수 = 가장 좋은 자리 점수 × 0.9 + 자리 여유(1년 내내 80점 이상인 칸의 비율) × 10.
  * 범위가 넓은 식물은 방 어디에나 100점짜리 칸이 있기 마련이라, 자리 점수만으로는 순위가 갈리지 않는다.
  * 1년 내내 70점 이상인 칸이 있으면 고정 자리, 없으면 계절마다 가장 좋은 칸(계절 이동 자리).
@@ -33,16 +35,25 @@ public final class PlantScorer {
 	private PlantScorer() {
 	}
 
+	/** 칸 하나의 항목별 점수(0~1)와 칸 점수(0~100, 소수 한 자리). */
+	public record Parts(double light, double direct, double distance, double score) {
+	}
+
 	public static double score(PlantSpecies p, Cell c) {
+		return parts(p, c).score();
+	}
+
+	public static Parts parts(PlantSpecies p, Cell c) {
 		double light;
 		if (c.lux() < p.getMinLux()) {
 			light = EDGE * Math.pow(Math.max(c.lux(), 1) / p.getMinLux(), 0.7);
 		} else if (c.lux() > p.getMaxLux()) {
 			light = EDGE * Math.pow(p.getMaxLux() / c.lux(), 0.5);
 		} else if (p.getMaxLux() > p.getMinLux()) {
-			// 범위 안 위치(로그 눈금 0~1): 가운데 절반(0.25~0.75)이면 1, 끝(0 또는 1)이면 0.8
+			// 범위 안 위치(로그 눈금 0~1): 가운데 1 → 끝 0.8, 곡선으로 이어짐
 			double t = Math.log(c.lux() / p.getMinLux()) / Math.log((double) p.getMaxLux() / p.getMinLux());
-			light = 1 - (1 - EDGE) * Math.max(0, Math.abs(t - 0.5) - 0.25) / 0.25;
+			double off = 2 * Math.abs(t - 0.5);
+			light = 1 - (1 - EDGE) * off * off;
 		} else {
 			light = 1;
 		}
@@ -54,7 +65,11 @@ public final class PlantScorer {
 			direct *= Math.pow((double) Math.max(p.getMaxDirectMinutes(), 15) / c.directMinutes(), 0.7);
 		}
 		double distance = 1 - MAX_DISTANCE_PENALTY * Math.min(1, placementGap(p, c) / DISTANCE_PENALTY_SPAN_CM);
-		return Math.round(100 * light * direct * distance * 10) / 10.0;
+		return new Parts(light, direct, distance, round1(100 * light * direct * distance));
+	}
+
+	private static double round1(double v) {
+		return Math.round(v * 10) / 10.0;
 	}
 
 	/** 농사로 배치장소(창에서 거리) 기준에 맞는가. 기준이 없으면 맞는 것으로 본다. */
@@ -83,7 +98,19 @@ public final class PlantScorer {
 
 	/** 한 식물의 방 추천 결과. */
 	public record PlantResult(PlantSpecies plant, SpotType type, double score, Spot fixed, Map<SeasonDay, Spot> seasonal,
-			List<String> notes, double roomyShare) {
+			List<String> notes, double roomyShare, Breakdown breakdown) {
+	}
+
+	/** 추천 자리의 계절별 항목 점수. */
+	public record SeasonParts(SeasonDay season, Parts parts) {
+	}
+
+	/**
+	 * 점수 내역: 종합 = 자리 점수 × 0.9 + 자리 여유 × 10, 겨울 온도가 모자라면 × 0.7.
+	 * 자리 점수는 고정 자리면 (계절 최저 × 0.6 + 평균 × 0.4), 계절 이동이면 계절별 가장 좋은 칸 평균 × 0.9.
+	 */
+	public record Breakdown(List<SeasonParts> seasons, double spotScore, double roomyBonus, double temperatureFactor,
+			double total) {
 	}
 
 	/** 계절별 칸 결과(칸 순서가 계절마다 같아야 함)로 고정/계절 이동 자리를 찾는다. */
@@ -132,11 +159,15 @@ public final class PlantScorer {
 
 		double share = n == 0 ? 0 : (double) roomy / n;
 		List<String> notes = new ArrayList<>();
+		List<SeasonParts> seasonParts = new ArrayList<>();
 		SpotType type;
 		double score;
 		if (fixed != null && fixed.score() >= FIXED_THRESHOLD) {
 			type = SpotType.FIXED;
 			score = bestMin * 0.6 + bestAvg * 0.4;
+			for (SeasonDay s : SeasonDay.values()) {
+				seasonParts.add(new SeasonParts(s, parts(p, seasons.get(s).get(bestIdx))));
+			}
 			if (!withinPlacement(p, fixed.cell())) {
 				notes.add("농사로 추천 배치(창에서 " + p.getMinWindowDistance() + "~" + p.getMaxWindowDistance()
 						+ "cm)와 다르지만 계산상 이 자리가 맞습니다.");
@@ -144,14 +175,24 @@ public final class PlantScorer {
 		} else {
 			type = SpotType.SEASONAL;
 			score = seasonalSum / 4 * 0.9; // 옮겨야 하는 수고만큼 조금 낮춤
+			seasonal.forEach((s, spot) -> {
+				if (spot != null) {
+					seasonParts.add(new SeasonParts(s, parts(p, spot.cell())));
+				}
+			});
 			notes.add("한 자리에서는 1년 내내 맞지 않아 계절마다 자리를 옮기는 것이 좋습니다.");
 		}
-		score = Math.round((score * 0.9 + share * 10) * 10) / 10.0;
+		double spotScore = round1(score);
+		double roomyBonus = round1(share * 10);
+		double temperatureFactor = 1;
+		score = round1(score * 0.9 + share * 10);
 		if (p.getWinterMinTemp() != null && roomWinterMinTemp != null && roomWinterMinTemp < p.getWinterMinTemp()) {
 			notes.add(String.format("겨울 실내 최저 %.1f℃가 이 식물의 겨울 최저온도 %d℃보다 낮습니다. 창가에서 떨어뜨리거나 보온하세요.",
 					roomWinterMinTemp, p.getWinterMinTemp()));
-			score = Math.round(score * 0.7 * 10) / 10.0;
+			temperatureFactor = 0.7;
+			score = round1(score * 0.7);
 		}
-		return new PlantResult(p, type, score, fixed, seasonal, notes, share);
+		return new PlantResult(p, type, score, fixed, seasonal, notes, share,
+				new Breakdown(seasonParts, spotScore, roomyBonus, temperatureFactor, score));
 	}
 }
