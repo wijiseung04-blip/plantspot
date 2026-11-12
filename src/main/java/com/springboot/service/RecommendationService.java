@@ -167,7 +167,17 @@ public class RecommendationService {
 				.map(c -> new CellScore(c.x(), c.y(), PlantScorer.score(p, c), PlantScorer.withinPlacement(p, c)))
 				.toList()));
 		PlantResult r = PlantScorer.evaluate(p, seasons, room.getWinterMinTemp());
-		return new PlantFit(p.getId(), p.getName(), r.type(), r.score(), percent(r.roomyShare()), r.notes(), map);
+		return new PlantFit(p.getId(), p.getName(), r.type(), r.score(), percent(r.roomyShare()), r.notes(), map,
+				breakdown(r));
+	}
+
+	private static BreakdownView breakdown(PlantResult r) {
+		PlantScorer.Breakdown b = r.breakdown();
+		List<SeasonPartView> seasons = b.seasons().stream()
+				.map(sp -> new SeasonPartView(sp.season(), sp.season().getLabel(), percent(sp.parts().light()),
+						percent(sp.parts().direct()), percent(sp.parts().distance()), sp.parts().score()))
+				.toList();
+		return new BreakdownView(seasons, b.spotScore(), b.roomyBonus(), b.temperatureFactor(), b.total());
 	}
 
 	private static int percent(double share) {
@@ -228,6 +238,15 @@ public class RecommendationService {
 	}
 
 	public record PlantFit(Long plantId, String name, SpotType type, double score, int roomyPercent, List<String> notes,
-			Map<SeasonDay, List<CellScore>> seasons) {
+			Map<SeasonDay, List<CellScore>> seasons, BreakdownView breakdown) {
+	}
+
+	/** 추천 자리의 계절별 항목 점수: 빛·직사광·창 거리(%, 100이면 감점 없음)와 칸 점수 */
+	public record SeasonPartView(SeasonDay season, String label, int light, int direct, int distance, double score) {
+	}
+
+	/** 점수 내역: total = spotScore × 0.9 + roomyBonus, 겨울 온도가 모자라면 × temperatureFactor(0.7) */
+	public record BreakdownView(List<SeasonPartView> seasons, double spotScore, double roomyBonus,
+			double temperatureFactor, double total) {
 	}
 }
