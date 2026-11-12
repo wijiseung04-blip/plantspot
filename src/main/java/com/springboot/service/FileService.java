@@ -48,6 +48,9 @@ public class FileService {
 		if (file == null || file.isEmpty()) {
 			throw new IllegalArgumentException("빈 파일입니다.");
 		}
+		if (!category.isUploadable()) {
+			throw new IllegalArgumentException(category.getLabel() + "는 더 이상 올릴 수 없습니다.");
+		}
 		String originalName = cleanName(file.getOriginalFilename());
 		String ext = extension(originalName);
 		if (!category.getExtensions().contains(ext)) {
@@ -66,9 +69,6 @@ public class FileService {
 		}
 		UploadFile saved = repository.save(new UploadFile(memberService.get(me.getId()), category, originalName,
 				storedName, contentType(ext, file.getContentType()), file.getSize(), roomId));
-		if (category == FileCategory.FLOOR_PLAN && roomId != null) {
-			houseService.attachFloorPlan(me, roomId, saved.getId());
-		}
 		log.info("파일 업로드: {} {} {}바이트 (회원 {})", category, originalName, file.getSize(), me.getUsername());
 		return FileResponse.of(saved);
 	}

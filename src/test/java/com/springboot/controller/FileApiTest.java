@@ -135,7 +135,7 @@ class FileApiTest {
 	}
 
 	@Test
-	void 평면도를_방에_올리면_방에_연결된다() throws Exception {
+	void 방에_연결해_올리기와_평면도_이미지_막기() throws Exception {
 		TestBuildings.insertHadan(jdbc);
 		String house = mvc.perform(post("/api/houses").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"dong\":\"하단동\",\"jibun\":\"1160-6\",\"name\":\"집\",\"floor\":1}").with(csrf()).with(user(owner)))
@@ -145,15 +145,19 @@ class FileApiTest {
 				.with(csrf()).with(user(owner))).andReturn().getResponse().getHeader("Location");
 		String roomId = room.substring(room.lastIndexOf('/') + 1);
 
-		MockMultipartFile png = new MockMultipartFile("file", "plan.png", "image/png", new byte[] { 1, 2, 3 });
-		String fileId = mvc.perform(multipart("/api/files").file(png).param("category", "FLOOR_PLAN")
-				.param("roomId", roomId).with(csrf()).with(user(owner)))
-				.andExpect(status().isCreated()).andReturn().getResponse().getHeader("Location").replace("/api/files/", "");
-		mvc.perform(get(room).with(user(owner))).andExpect(jsonPath("$.floorPlanFileId").value(Long.parseLong(fileId)));
+		MockMultipartFile png = new MockMultipartFile("file", "plant.png", "image/png", new byte[] { 1, 2, 3 });
+		mvc.perform(multipart("/api/files").file(png).param("category", "PLANT_PHOTO").param("roomId", roomId)
+				.with(csrf()).with(user(owner))).andExpect(status().isCreated());
 
 		// 남의 방에는 못 올린다
-		mvc.perform(multipart("/api/files").file(png).param("category", "FLOOR_PLAN").param("roomId", roomId)
+		mvc.perform(multipart("/api/files").file(png).param("category", "PLANT_PHOTO").param("roomId", roomId)
 				.with(csrf()).with(user(other))).andExpect(status().isForbidden());
+
+		// 평면도 이미지는 기능을 뺐다 → 새로 올릴 수 없다
+		mvc.perform(multipart("/api/files").file(png).param("category", "FLOOR_PLAN").param("roomId", roomId)
+				.with(csrf()).with(user(owner)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("더 이상 올릴 수 없습니다")));
 	}
 
 	@Test

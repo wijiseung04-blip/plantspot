@@ -37,7 +37,7 @@ public class FileApiController {
 		this.service = service;
 	}
 
-	/** multipart/form-data: file, category(SENSOR_LOG / FLOOR_PLAN / PLANT_PHOTO), roomId(선택) */
+	/** multipart/form-data: file, category(SENSOR_LOG / PLANT_PHOTO), roomId(선택) */
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<FileResponse> upload(@AuthenticationPrincipal LoginMember me,
 			@RequestPart("file") MultipartFile file, @RequestParam("category") FileCategory category,
