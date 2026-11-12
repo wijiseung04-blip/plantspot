@@ -29,7 +29,6 @@ public final class Codes {
 	/** domain.FileCategory */
 	public static final List<FileCategory> FILE_CATEGORIES = List.of(
 			new FileCategory("SENSOR_LOG", "센서 기록 파일", "csv, log, txt"),
-			new FileCategory("FLOOR_PLAN", "평면도 이미지", "gif, jpeg, jpg, png, webp"),
 			new FileCategory("PLANT_PHOTO", "식물 사진", "gif, heic, jpeg, jpg, png, webp"));
 
 	/** 농사로 광요구도 코드 */

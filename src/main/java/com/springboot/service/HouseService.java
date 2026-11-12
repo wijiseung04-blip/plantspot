@@ -226,11 +226,6 @@ public class HouseService {
 		return max;
 	}
 
-	@Transactional
-	public void attachFloorPlan(LoginMember me, Long roomId, Long fileId) {
-		loadRoom(me, roomId).attachFloorPlan(fileId);
-	}
-
 	// ----- 창문 -----
 
 	@Transactional

@@ -47,14 +47,14 @@ public final class HouseResponses {
 	}
 
 	public record RoomResponse(Long id, Long houseId, String name, List<Point> shape, double orientationDeg,
-			double ceilingHeight, CurtainType curtain, String curtainLabel, double areaM2, Long floorPlanFileId,
+			double ceilingHeight, CurtainType curtain, String curtainLabel, double areaM2,
 			Double winterMinTemp, List<WindowResponse> windows, InnerGlassView innerGlass) {
 
 		public static RoomResponse of(Room r) {
 			List<Point> points = r.points();
 			return new RoomResponse(r.getId(), r.getHouse().getId(), r.getName(), points, r.getOrientationDeg(),
 					r.getCeilingHeight(), r.getCurtain(), r.getCurtain().getLabel(),
-					Math.round(Math.abs(Shape.signedArea(points)) / 10_000.0 * 100) / 100.0, r.getFloorPlanFileId(),
+					Math.round(Math.abs(Shape.signedArea(points)) / 10_000.0 * 100) / 100.0,
 					r.getWinterMinTemp(), r.getWindows().stream().map(WindowResponse::of).toList(),
 					r.hasInnerGlass() ? new InnerGlassView(r.getInnerGlassWall(), r.getInnerGlassDistance(),
 							r.getInnerGlassTransmittance()) : null);

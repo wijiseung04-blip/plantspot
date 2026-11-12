@@ -70,7 +70,7 @@ domain      (JPA 엔티티) ──► SQLite 파일 data/plantspot.db
 | member | Member | 회원 (아이디, BCrypt 비밀번호, 닉네임, 권한 USER/ADMIN) |
 | building | Building | 건물 (동·지번, 동 이름, 용도, 층수, 원래 높이·최종 높이·높이 출처, 넓이, 중심점, 외곽선 WKT, 위경도) |
 | house | House | 집 (회원, 건물, 층, 층 높이, 동 안 위치 unit_position, 중심점·위경도) |
-| room | Room | 방 (모양 "x,y;x,y;…", 평면도 위쪽 방향, 천장, 커튼, 겨울 최저 실내 온도, 평면도 이미지) |
+| room | Room | 방 (모양 "x,y;x,y;…", 평면도 위쪽 방향, 천장, 커튼, 겨울 최저 실내 온도, 안쪽 창 선) |
 | room_window | RoomWindow | 창문 (벽 번호, 벽 시작점에서 거리, 폭·높이·창턱, 방향은 계산) |
 | obstruction_angle | ObstructionAngle | 집의 5° 방향별 가림 각도 (출처 BUILDING·TERRAIN·SENSOR, 원인 건물, 거리) |
 | sunlight_summary / sunlight_cell | SunlightSummary / SunlightCell | 방·계절·연도별 요약(낮 길이, 창별 해 드는 시간)과 칸별 결과(직사광 분, lux, 밝기 단계) |

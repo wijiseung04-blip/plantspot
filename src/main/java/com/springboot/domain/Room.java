@@ -59,7 +59,6 @@ public class Room {
 	@Column(name = "winter_min_temp")
 	private Double winterMinTemp;
 
-	/** 평면도 이미지(업로드 파일) 번호, 없으면 null */
 	/**
 	 * 안쪽 창 선 (발코니 + 거실처럼 창이 두 겹인 방): 벽 inner_glass_wall 에서 방 안쪽으로 inner_glass_distance(cm)에
 	 * 유리 한 겹이 더 있다. 그 선보다 안쪽 칸은 하늘빛에 inner_glass_transmittance 를 한 번 더 곱한다. 없으면 null.
@@ -72,9 +71,6 @@ public class Room {
 
 	@Column(name = "inner_glass_transmittance")
 	private Double innerGlassTransmittance;
-
-	@Column(name = "floor_plan_file_id")
-	private Long floorPlanFileId;
 
 	@OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
 	@OrderBy("id")
@@ -134,10 +130,6 @@ public class Room {
 		return winterMinTemp;
 	}
 
-	public void attachFloorPlan(Long fileId) {
-		this.floorPlanFileId = fileId;
-	}
-
 	public List<Point> points() {
 		return Shape.decode(shape);
 	}
@@ -164,10 +156,6 @@ public class Room {
 
 	public CurtainType getCurtain() {
 		return curtain;
-	}
-
-	public Long getFloorPlanFileId() {
-		return floorPlanFileId;
 	}
 
 	public List<RoomWindow> getWindows() {
